@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+build/
+
+# Coverage
+coverage/
+
+# ESLint / SonarQube reports
+eslint-report.json
+.scannerwork/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+# Centralised log / command output — see logs/README.md
+# (logs/.gitignore ignores contents; the folder itself is kept.)
+logs/
+
+# Logs (legacy: root-level stray output is still ignored)
+*.log
+npm-debug.log*
+dev-run*.log
+dev-server*.log
+build-log.txt
+tsc-errors*.txt
+eslint-current.txt
+sonar-*.log
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright auth state (contains live session cookies — never commit)
+playwright/.auth/
+playwright-report/
+test-results/
+.playwright-profile/
+
+# local verification scratch files
+.tsc-*.txt
+.lint-*.txt
+.vit-*.txt
+.dev*.log
+.verify*
+.run-verify*
+.verify-run*

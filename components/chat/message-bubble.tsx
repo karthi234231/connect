@@ -1,0 +1,175 @@
+'use client'
+
+import { useState, type ReactNode } from 'react'
+import { Plus } from 'lucide-react'
+import { cn } from '@/utils/cn'
+import {
+  MESSAGE_REACTIONS,
+  type MessageReaction,
+  type ReactionSummary,
+} from '@/lib/chat/reactions'
+
+const STATUS_GLYPH: Record<'sent' | 'read' | 'pending', string> = {
+  sent: '\u2713',
+  read: '\u2713\u2713',
+  pending: '\u00b7\u00b7\u00b7',
+}
+
+const STATUS_LABEL: Record<'sent' | 'read' | 'pending', string> = {
+  sent: 'Sent',
+  read: 'Read',
+  pending: 'Sending',
+}
+
+export interface MessageBubbleProps {
+  text: string
+  time?: string
+  sent?: boolean
+  status?: 'sent' | 'read' | 'pending'
+  initials?: string
+  tone?: string
+  displayName?: string
+  showSender?: boolean
+  /**
+   * Aggregated reaction chips rendered under the bubble. Omit to hide the
+   * whole reaction affordance for this message.
+   */
+  reactions?: ReactionSummary[]
+  /** Toggles a reaction for this message; makes chips interactive. */
+  onToggleReaction?: (emoji: MessageReaction) => void
+}
+
+export function MessageBubble({
+  text,
+  time,
+  sent = false,
+  status,
+  initials,
+  tone,
+  displayName,
+  showSender = false,
+  reactions,
+  onToggleReaction,
+}: MessageBubbleProps): ReactNode {
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const reactionControls =
+    reactions === undefined ? null : (
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-1',
+          sent ? 'justify-end' : 'justify-start',
+        )}
+      >
+        {reactions.map((reaction) => (
+          <button
+            key={reaction.emoji}
+            type="button"
+            onClick={() => onToggleReaction?.(reaction.emoji)}
+            aria-pressed={reaction.reactedByViewer}
+            aria-label={reaction.label}
+            className={cn(
+              'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition',
+              reaction.reactedByViewer
+                ? 'border-[var(--cx-brand)] bg-[var(--cx-brand-soft)] text-[var(--cx-brand-strong)]'
+                : 'border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] text-[var(--cx-text-2)] hover:bg-[var(--cx-surface-3)]',
+            )}
+          >
+            <span aria-hidden="true">{reaction.emoji}</span>
+            <span>{reaction.count}</span>
+          </button>
+        ))}
+        {onToggleReaction && pickerOpen ? (
+          <div
+            role="group"
+            aria-label="Choose a reaction"
+            className="flex items-center gap-1 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-1.5 py-0.5"
+          >
+            {MESSAGE_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  onToggleReaction(emoji)
+                  setPickerOpen(false)
+                }}
+                aria-label={`React with ${emoji}`}
+                className="rounded-full px-1 text-sm transition hover:bg-[var(--cx-surface-3)]"
+              >
+                <span aria-hidden="true">{emoji}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {onToggleReaction ? (
+          <button
+            type="button"
+            onClick={() => setPickerOpen((open) => !open)}
+            aria-label="Add reaction"
+            aria-expanded={pickerOpen}
+            className="flex size-5 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] text-[var(--cx-text-3)] transition hover:bg-[var(--cx-surface-3)] hover:text-[var(--cx-text-1)]"
+          >
+            <Plus className="size-3" />
+          </button>
+        ) : null}
+      </div>
+    )
+
+  if (sent) {
+    return (
+      <div className="ml-auto flex w-fit max-w-[82%] flex-col items-end gap-0.5">
+        <div className="rounded-2xl rounded-tr-md bg-[var(--cx-brand)] px-3.5 py-2.5 text-sm text-white">
+          <p className="break-words whitespace-pre-wrap">{text}</p>
+          {time || status ? (
+            <div className="mt-1 flex items-center justify-end gap-1 text-[9px] text-white/65">
+              {time ? <span>{time}</span> : null}
+              {status ? (
+                <>
+                  <span className="sr-only">{STATUS_LABEL[status]}</span>
+                  <span aria-hidden="true">{STATUS_GLYPH[status]}</span>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {reactionControls}
+      </div>
+    )
+  }
+
+  const bubble = (
+    <div className="flex w-fit max-w-[min(82%,280px)] flex-col gap-0.5">
+      {displayName && showSender ? (
+        <p className="text-[10px] font-medium leading-tight text-[var(--cx-text-3)]">
+          {displayName}
+        </p>
+      ) : null}
+      <div className="w-fit rounded-2xl rounded-tl-md border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-3.5 py-2.5 text-sm text-[var(--cx-text-2)]">
+        <p className="break-words whitespace-pre-wrap">{text}</p>
+        {time ? (
+          <div className="mt-1 text-[9px] text-[var(--cx-text-4)]">{time}</div>
+        ) : null}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="flex w-fit max-w-full flex-col gap-0.5">
+      <div className={cn('flex w-fit max-w-full items-end gap-2')}>
+        {showSender && initials ? (
+          <div
+            aria-hidden="true"
+            className={cn(
+              'flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-[#332d3d]',
+              tone,
+            )}
+          >
+            {initials}
+          </div>
+        ) : null}
+        {bubble}
+      </div>
+      {reactionControls}
+    </div>
+  )
+}

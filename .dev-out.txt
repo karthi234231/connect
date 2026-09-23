@@ -1,0 +1,718 @@
+
+> connect@1.0.0 dev
+> next dev
+
+▲ Next.js 16.3.5 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.29.76:3000
+- Environments: .env.local
+✓ Ready in 2.2s
+✓ Running next.config.mjs took 38ms
+{"timestamp":"2026-09-21T15:13:43.558Z","level":"info","message":"Error reporting disabled (NEXT_PUBLIC_SENTRY_DSN unset)","context":{"runtime":"nodejs"}}
+{"timestamp":"2026-09-21T15:13:43.905Z","level":"info","message":"Environment validated","context":{"runtime":"nodejs"}}
+- Experiments (use with caution):
+  · optimizePackageImports
+
+ GET / 200 in 4.1s (next.js: 3.1s, application-code: 1043ms)
+ GET /manifest.webmanifest 200 in 430ms (next.js: 321ms, application-code: 109ms)
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <LoadingBoundaryProvider loading={[...]}>
+                      <SegmentViewNode type="layout" pagePath="layout.tsx">
+                        <SegmentTrieNode>
+                        <link>
+                        <script>
+                        <RootLayout>
+                          <html lang="en" suppressHydrationWarning={true}>
+                            <body
+                              className="inter_fd091ad6-module__giF-bG__variable space_grotesk_d2a1ec3b-module__cnUgTW..."
+-                             data-new-gr-c-s-check-loaded="14.1330.0"
+-                             data-gr-ext-installed=""
+                            >
+                  ...
+ 
+ GET / 200 in 245ms (next.js: 76ms, application-code: 169ms)
+ GET /browse 200 in 676ms (next.js: 293ms, application-code: 383ms)
+ GET /privacy 200 in 911ms (next.js: 448ms, application-code: 463ms)
+ GET /terms 200 in 542ms (next.js: 192ms, application-code: 350ms)
+ GET /login 200 in 1207ms (next.js: 136ms, proxy.ts: 712ms, application-code: 358ms)
+ GET /events 200 in 2.7s (next.js: 2.5s, application-code: 208ms)
+ GET /suspended 200 in 223ms (next.js: 122ms, application-code: 101ms)
+ GET /callback 307 in 400ms (next.js: 278ms, proxy.ts: 52ms, application-code: 69ms)
+ GET / 200 in 737ms (next.js: 143ms, application-code: 593ms)
+ GET /manifest.webmanifest 200 in 290ms (next.js: 49ms, application-code: 241ms)
+ GET /login 200 in 1265ms (next.js: 486ms, proxy.ts: 343ms, application-code: 435ms)
+ GET / 200 in 395ms (next.js: 184ms, application-code: 211ms)
+ GET /browse 200 in 445ms (next.js: 233ms, application-code: 212ms)
+ GET /login 200 in 322ms (next.js: 22ms, proxy.ts: 182ms, application-code: 118ms)
+ GET /privacy 200 in 228ms (next.js: 147ms, application-code: 81ms)
+ GET /terms 200 in 221ms (next.js: 132ms, application-code: 89ms)
+ GET /events 200 in 211ms (next.js: 129ms, application-code: 82ms)
+ GET /suspended 200 in 187ms (next.js: 127ms, application-code: 60ms)
+ GET /dashboard/discover 307 in 2.6s (proxy.ts: 1559ms)
+ GET /manifest.webmanifest 200 in 84ms (next.js: 51ms, application-code: 33ms)
+{"timestamp":"2026-09-21T15:16:37.979Z","level":"error","message":"Matching config: matching_weights lookup failed; DEFAULTS ARE LIVE","context":{"algorithmVersion":"mmm-rule-v1","weightsVersion":"v1"}}
+{"timestamp":"2026-09-21T15:16:37.987Z","level":"debug","message":"Cache miss / recomputed: matching-weights","context":{"tags":["matching:weights"],"durationMs":355}}
+{"timestamp":"2026-09-21T15:16:38.059Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 5.9s (next.js: 19ms, proxy.ts: 495ms, application-code: 5.3s)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ POST /dashboard/discover 200 in 1321ms (next.js: 15ms, proxy.ts: 584ms, application-code: 723ms)
+  └─ ƒ getOwnProfileAction() in 680ms app/actions/profile-read.ts
+ POST /dashboard/discover 200 in 1180ms (next.js: 66ms, proxy.ts: 426ms, application-code: 688ms)
+  └─ ƒ getOwnProfileAction() in 661ms app/actions/profile-read.ts
+ GET /manifest.webmanifest 200 in 142ms (next.js: 61ms, application-code: 81ms)
+⨯ Error [AppError]: That swipe could not be saved.
+    at performSwipeAction (app\actions\swipe.ts:37:11)
+  35 |
+  36 |   if (!parsed.success) {
+> 37 |     throw new AppError(ErrorCodes.VALIDATION, 'That swipe could not be saved.')
+     |           ^
+  38 |   }
+  39 |
+  40 |   // Snapshot verification throws its own AppError codes (INVALID/FORGED/ {
+  code: 'VALIDATION',
+  statusCode: 400,
+  context: undefined,
+  userMessage: undefined,
+  digest: '875273360'
+}
+ POST /dashboard/discover 500 in 4.1s (next.js: 142ms, proxy.ts: 1562ms, application-code: 2.4s)
+  └─ ƒ performSwipeAction({"action":"like","candidateId":"00000000-0000-0000-0000-000000000004","clientIntentId":"19f0d0d8-c833-41fc-8bd4-d0c95b3f2bf9","...":"1 item not stringified"}) in 473ms app/actions/swipe.ts
+○ Compiling /dashboard/connections ...
+ GET /dashboard/connections 200 in 14.0s (next.js: 12.9s, proxy.ts: 578ms, application-code: 443ms)
+ GET /dashboard/events 200 in 7.1s (next.js: 6.0s, proxy.ts: 809ms, application-code: 279ms)
+ GET /dashboard/events 200 in 1846ms (next.js: 46ms, proxy.ts: 1667ms, application-code: 133ms)
+ GET /dashboard/events 200 in 852ms (next.js: 63ms, proxy.ts: 608ms, application-code: 181ms)
+ GET /dashboard/events 200 in 674ms (next.js: 18ms, proxy.ts: 591ms, application-code: 64ms)
+ GET /dashboard/profile 200 in 5.5s (next.js: 3.6s, proxy.ts: 1830ms, application-code: 86ms)
+ GET /manifest.webmanifest 200 in 134ms (next.js: 47ms, application-code: 88ms)
+○ Compiling /dashboard/chat ...
+ GET /dashboard/events 200 in 3.7s (next.js: 372ms, proxy.ts: 2.5s, application-code: 853ms)
+ GET /dashboard/connections 200 in 5.9s (next.js: 791ms, proxy.ts: 4.7s, application-code: 462ms)
+ GET /dashboard/events 200 in 3.6s (next.js: 1005ms, proxy.ts: 2.4s, application-code: 206ms)
+ GET /dashboard/events 200 in 617ms (next.js: 78ms, proxy.ts: 495ms, application-code: 44ms)
+ GET /dashboard/events 200 in 532ms (next.js: 42ms, proxy.ts: 427ms, application-code: 63ms)
+ GET /manifest.webmanifest 200 in 89ms (next.js: 50ms, application-code: 39ms)
+✓ Finished filesystem cache database compaction in 15.8s
+ POST /dashboard/events 200 in 1948ms (next.js: 54ms, proxy.ts: 1153ms, application-code: 741ms)
+  └─ ƒ getHostedEventsAction() in 690ms app/actions/hosted-events.ts
+ POST /dashboard/events 200 in 1971ms (next.js: 54ms, proxy.ts: 999ms, application-code: 918ms)
+  └─ ƒ getHostedEventsAction() in 898ms app/actions/hosted-events.ts
+ GET /dashboard/chat 200 in 4.9s (next.js: 3.2s, proxy.ts: 1091ms, application-code: 581ms)
+ GET /dashboard/chat 200 in 26.9s (next.js: 25.0s, proxy.ts: 1736ms, application-code: 203ms)
+✓ Finished filesystem cache database compaction in 13.6s
+ GET /dashboard/profile 200 in 8.8s (next.js: 1989ms, proxy.ts: 5.5s, application-code: 1335ms)
+ GET /dashboard/profile 200 in 6.6s (next.js: 3.1s, proxy.ts: 2.8s, application-code: 681ms)
+ GET /dashboard/profile 200 in 912ms (next.js: 88ms, proxy.ts: 617ms, application-code: 207ms)
+ GET /dashboard/profile 200 in 1278ms (next.js: 58ms, proxy.ts: 1009ms, application-code: 210ms)
+ GET /dashboard/profile 200 in 1291ms (next.js: 116ms, proxy.ts: 726ms, application-code: 449ms)
+○ Compiling /dashboard/settings ...
+ GET /dashboard/connections 200 in 3.1s (next.js: 202ms, proxy.ts: 868ms, application-code: 2.0s)
+ GET /dashboard/connections 200 in 3.3s (next.js: 706ms, proxy.ts: 825ms, application-code: 1777ms)
+ GET /dashboard/profile 200 in 3.3s (next.js: 748ms, proxy.ts: 738ms, application-code: 1804ms)
+ GET /dashboard/events 200 in 3.8s (next.js: 381ms, proxy.ts: 2.4s, application-code: 991ms)
+ POST /dashboard/connections 200 in 2.8s (next.js: 119ms, proxy.ts: 1014ms, application-code: 1646ms)
+ GET /dashboard/profile 200 in 2.7s (next.js: 77ms, proxy.ts: 2.2s, application-code: 430ms)
+ GET /manifest.webmanifest 200 in 265ms (next.js: 87ms, application-code: 178ms)
+⨯ Error: aborted
+    at ignore-listed frames {
+  code: 'ECONNRESET'
+}
+ POST /dashboard/events 200 in 2.5s (next.js: 112ms, proxy.ts: 1401ms, application-code: 1007ms)
+  └─ ƒ getOwnProfileAction() in 771ms app/actions/profile-read.ts
+ POST /dashboard/events 200 in 4.0s (next.js: 528ms, proxy.ts: 999ms, application-code: 2.5s)
+  └─ ƒ getHostedEventsAction() in 1802ms app/actions/hosted-events.ts
+ GET /dashboard/chat 200 in 10.5s (next.js: 1971ms, proxy.ts: 2.3s, application-code: 6.2s)
+ POST /dashboard/chat 200 in 3.1s (next.js: 589ms, proxy.ts: 858ms, application-code: 1655ms)
+  └─ ƒ getOwnProfileAction() in 689ms app/actions/profile-read.ts
+ POST /dashboard/events 200 in 1074ms (next.js: 237ms, proxy.ts: 106ms, application-code: 731ms)
+  └─ ƒ getHostedEventsAction() in 657ms app/actions/hosted-events.ts
+ POST /dashboard/chat 200 in 1795ms (next.js: 42ms, proxy.ts: 604ms, application-code: 1149ms)
+ GET /manifest.webmanifest 200 in 177ms (next.js: 66ms, application-code: 111ms)
+ POST /dashboard/chat 200 in 1626ms (next.js: 90ms, proxy.ts: 440ms, application-code: 1096ms)
+  └─ ƒ getInboxAction({}) in 1062ms app/actions/inbox.ts
+ POST /dashboard/chat 200 in 1280ms (next.js: 26ms, proxy.ts: 462ms, application-code: 792ms)
+  └─ ƒ getMatchesAction(undefined) in 758ms app/actions/matches.ts
+ POST /dashboard/chat 200 in 1284ms (next.js: 30ms, proxy.ts: 475ms, application-code: 779ms)
+  └─ ƒ getOwnProfileAction() in 741ms app/actions/profile-read.ts
+ POST /dashboard/chat 200 in 1486ms (next.js: 28ms, proxy.ts: 447ms, application-code: 1011ms)
+  └─ ƒ getInboxAction({}) in 978ms app/actions/inbox.ts
+ POST /dashboard/chat 200 in 1137ms (next.js: 22ms, proxy.ts: 433ms, application-code: 682ms)
+  └─ ƒ getMatchesAction(undefined) in 655ms app/actions/matches.ts
+ POST /dashboard/chat 200 in 1235ms (next.js: 40ms, proxy.ts: 462ms, application-code: 734ms)
+  └─ ƒ getOwnProfileAction() in 681ms app/actions/profile-read.ts
+ GET / 200 in 3.4s (next.js: 1453ms, application-code: 1986ms)
+✓ Compiled in 22.8s
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+  Reload env: .env.local
+✓ Compiled in 7.4s
+ GET /dashboard/chat 200 in 14.3s (next.js: 2.6s, proxy.ts: 11.3s, application-code: 330ms)
+ GET /manifest.webmanifest 200 in 1230ms (next.js: 1086ms, application-code: 144ms)
+ GET /login 200 in 2.3s (next.js: 343ms, proxy.ts: 203ms, application-code: 1739ms)
+ GET /login 200 in 1014ms (next.js: 76ms, proxy.ts: 394ms, application-code: 544ms)
+[browser] eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.
+React will never use eval() in production mode 
+[browser] ⚠️ Some public environment variables are missing or invalid: (lib/env.ts:86:15)
+[browser]   ❌ NEXT_PUBLIC_SUPABASE_URL: Invalid input: expected string, received undefined (received: undefined)
+  ❌ NEXT_PUBLIC_SUPABASE_ANON_KEY: Invalid input: expected string, received undefined (received: undefined)
+  ❌ NEXT_PUBLIC_APP_URL: Invalid input: expected string, received undefined (received: undefined) (lib/env.ts:89:15)
+[browser] The app may not work correctly. Please check your .env.local file. (lib/env.ts:90:15)
+✓ Compiled in 17.9s
+ GET /dashboard/chat 200 in 4.5s (next.js: 675ms, proxy.ts: 3.5s, application-code: 368ms)
+ GET /manifest.webmanifest 200 in 270ms (next.js: 144ms, application-code: 127ms)
+✓ Compiled in 6.2s
+ GET /dashboard/chat 200 in 9.5s (next.js: 1439ms, proxy.ts: 6.2s, application-code: 1865ms)
+ GET /manifest.webmanifest 200 in 492ms (next.js: 140ms, application-code: 352ms)
+✓ Finished filesystem cache database compaction in 18.0s
+⨯ ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+  [90m 9 |[0m
+  [90m10 |[0m [36mexport[0m [36mdefault[0m [36mfunction[0m [33mDashboardLayout[0m({
+[31m[1m>[0m [90m11 |[0m
+  [90m   |[0m [31m[1m^[0m
+
+Parsing ecmascript source code failed
+
+
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+{"timestamp":"2026-09-21T15:42:20.153Z","level":"error","message":"Matching config: matching_weights lookup failed; DEFAULTS ARE LIVE","context":{"algorithmVersion":"mmm-rule-v1","weightsVersion":"v1"}}
+{"timestamp":"2026-09-21T15:42:20.167Z","level":"debug","message":"Cache miss / recomputed: matching-weights","context":{"tags":["matching:weights"],"durationMs":548}}
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+{"timestamp":"2026-09-21T15:42:22.195Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+ GET /dashboard/discover 500 in 5.3s (next.js: 2.9s, proxy.ts: 2.1s, application-code: 304ms)
+⨯ ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+  [90m 9 |[0m
+  [90m10 |[0m [36mexport[0m [36mdefault[0m [36mfunction[0m [33mDashboardLayout[0m({
+[31m[1m>[0m [90m11 |[0m
+  [90m   |[0m [31m[1m^[0m
+
+Parsing ecmascript source code failed
+
+
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+ GET /dashboard/chat 500 in 3.6s (next.js: 221ms, proxy.ts: 3.4s, application-code: 60ms)
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+ GET /dashboard/discover 200 in 16.2s (next.js: 1800ms, proxy.ts: 1163ms, application-code: 13.2s)
+⨯ Error: The destination stream closed early.
+    at ignore-listed frames {
+  digest: '3936447664'
+}
+[browser] Uncaught Error: ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed
+
+
+    at <unknown> (Error: ./app/dashboard/layout.tsx:11:1)
+    at <unknown> (Error: (./app/dashboard/layout.tsx:11:1)
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+[browser] ./app/dashboard/layout.tsx:11:1
+Error: Unexpected token `<eof>`. Expected identifier, string literal, numeric literal or [ for the computed key
+   9 |
+  10 | export default function DashboardLayout({
+> 11 |
+     | ^
+
+Parsing ecmascript source code failed 
+ GET /dashboard/chat 200 in 11.4s (next.js: 423ms, proxy.ts: 3.2s, application-code: 7.8s)
+ GET /manifest.webmanifest 200 in 888ms (next.js: 85ms, application-code: 802ms)
+✓ Compiled in 5.2s
+✓ Compiled in 2.1s
+ GET /dashboard/chat 200 in 9.7s (next.js: 1600ms, proxy.ts: 6.6s, application-code: 1477ms)
+✓ Compiled in 996ms
+ GET /dashboard/chat 200 in 9.1s (next.js: 1073ms, proxy.ts: 7.7s, application-code: 366ms)
+ GET /dashboard/chat 200 in 1316ms (next.js: 53ms, proxy.ts: 977ms, application-code: 286ms)
+ GET /manifest.webmanifest 200 in 142ms (next.js: 44ms, application-code: 98ms)
+ POST /dashboard/chat 200 in 12.1s (next.js: 934ms, proxy.ts: 7.1s, application-code: 4.1s)
+  └─ ƒ getOwnProfileAction() in 1183ms app/actions/profile-read.ts
+ POST /dashboard/chat 200 in 3.7s (next.js: 172ms, proxy.ts: 1413ms, application-code: 2.2s)
+  └─ ƒ getInboxAction({}) in 1933ms app/actions/inbox.ts
+✓ Compiled in 1174ms
+ POST /dashboard/chat 200 in 3.1s (next.js: 158ms, proxy.ts: 1834ms, application-code: 1073ms)
+  └─ ƒ getMatchesAction(undefined) in 783ms app/actions/matches.ts
+○ Compiling /dashboard/events ...
+ GET /dashboard/events 200 in 12.8s (next.js: 11.5s, proxy.ts: 966ms, application-code: 416ms)
+ GET /dashboard/connections 200 in 12.7s (next.js: 489ms, proxy.ts: 12.0s, application-code: 190ms)
+ GET /dashboard/connections 200 in 572ms (next.js: 56ms, proxy.ts: 357ms, application-code: 159ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /manifest.webmanifest 200 in 183ms (next.js: 132ms, application-code: 52ms)
+ POST /dashboard/connections 200 in 2.8s (next.js: 68ms, proxy.ts: 2.0s, application-code: 701ms)
+  └─ ƒ getOwnProfileAction() in 577ms app/actions/profile-read.ts
+ GET /dashboard/connections 200 in 4.1s (next.js: 1049ms, proxy.ts: 1174ms, application-code: 1920ms)
+ POST /dashboard/connections 200 in 4.8s (next.js: 50ms, proxy.ts: 565ms, application-code: 4.2s)
+  └─ ƒ getConnectionFeedAction() in 3981ms app/actions/connection-feed.ts
+ POST /dashboard/connections 200 in 2.2s (next.js: 44ms, proxy.ts: 1184ms, application-code: 924ms)
+  └─ ƒ getConnectionFeedAction() in 867ms app/actions/connection-feed.ts
+ GET /manifest.webmanifest 200 in 227ms (next.js: 144ms, application-code: 84ms)
+{"timestamp":"2026-09-21T15:45:45.017Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 14.1s (next.js: 351ms, proxy.ts: 7.7s, application-code: 6.0s)
+ GET /manifest.webmanifest 200 in 130ms (next.js: 87ms, application-code: 44ms)
+✓ Compiled in 9.7s
+{"timestamp":"2026-09-21T15:46:26.140Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 5.0s (next.js: 598ms, proxy.ts: 1521ms, application-code: 2.9s)
+ GET /manifest.webmanifest 200 in 1930ms (next.js: 552ms, application-code: 1378ms)
+⨯ Error [AppError]: That swipe could not be saved.
+    at performSwipeAction (app\actions\swipe.ts:37:11)
+  35 |
+  36 |   if (!parsed.success) {
+> 37 |     throw new AppError(ErrorCodes.VALIDATION, 'That swipe could not be saved.')
+     |           ^
+  38 |   }
+  39 |
+  40 |   // Snapshot verification throws its own AppError codes (INVALID/FORGED/ {
+  code: 'VALIDATION',
+  statusCode: 400,
+  context: undefined,
+  userMessage: undefined,
+  digest: '2585327429'
+}
+ POST /dashboard/discover 500 in 5.7s (next.js: 49ms, proxy.ts: 3.1s, application-code: 2.5s)
+  └─ ƒ performSwipeAction({"action":"like","candidateId":"00000000-0000-0000-0000-000000000004","clientIntentId":"12beb4c1-2b1a-4716-b36f-0ec13990aa3a","...":"1 item not stringified"}) in 250ms app/actions/swipe.ts
+ GET /dashboard/chat 200 in 6.3s (next.js: 736ms, proxy.ts: 5.3s, application-code: 250ms)
+ GET /manifest.webmanifest 200 in 75ms (next.js: 30ms, application-code: 45ms)
+ POST /dashboard/chat 200 in 1138ms (next.js: 29ms, proxy.ts: 682ms, application-code: 426ms)
+  └─ ƒ getOwnProfileAction() in 378ms app/actions/profile-read.ts
+ POST /dashboard/chat 200 in 1663ms (next.js: 32ms, proxy.ts: 295ms, application-code: 1335ms)
+  └─ ƒ getOwnProfileAction() in 1302ms app/actions/profile-read.ts
+✓ Compiled in 5.4s
+ GET /dashboard/chat 200 in 1778ms (next.js: 132ms, proxy.ts: 1328ms, application-code: 319ms)
+ GET /manifest.webmanifest 200 in 119ms (next.js: 54ms, application-code: 64ms)
+{"timestamp":"2026-09-21T15:48:06.756Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+{"timestamp":"2026-09-21T15:48:07.022Z","level":"error","message":"Matching config: matching_weights lookup failed; DEFAULTS ARE LIVE","context":{"algorithmVersion":"mmm-rule-v1","weightsVersion":"v1"}}
+{"timestamp":"2026-09-21T15:48:07.025Z","level":"debug","message":"Cache miss / recomputed: matching-weights","context":{"tags":["matching:weights"],"durationMs":330}}
+ GET /dashboard/discover 200 in 8.8s (next.js: 832ms, proxy.ts: 3.7s, application-code: 4.2s)
+ GET /manifest.webmanifest 200 in 149ms (next.js: 83ms, application-code: 66ms)
+✓ Compiled in 3.7s
+{"timestamp":"2026-09-21T15:51:41.430Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 10.5s (next.js: 451ms, proxy.ts: 5.0s, application-code: 5.1s)
+ GET /manifest.webmanifest 200 in 950ms (next.js: 474ms, application-code: 476ms)
+✓ Compiled in 3.9s
+ GET /manifest.webmanifest 200 in 464ms (next.js: 150ms, application-code: 314ms)
+{"timestamp":"2026-09-21T15:52:01.474Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 9.9s (next.js: 397ms, proxy.ts: 2.8s, application-code: 6.6s)
+✓ Compiled in 5.2s
+Failed to record analytics [TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND precious-redbird-226125.upstash.io
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'precious-redbird-226125.upstash.io'
+  }
+}
+{"timestamp":"2026-09-21T15:56:59.380Z","level":"error","message":"requireActiveUser: profile lookup failed","context":{"userId":"b16b5b49-e640-4dbb-ab17-77bb3064d65f","error":"TypeError: fetch failed"}}
+⨯ Error [AppError]: Failed to verify account status
+    at requireActiveUser (lib\auth.ts:97:11)
+    at async requireUser (lib\auth.ts:63:22)
+    at async fetchDiscoverBatchAction (app\actions\discover.ts:33:18)
+    at async DiscoverPage (app\dashboard\discover\page.tsx:10:17)
+   95 |     })
+   96 |
+>  97 |     throw new AppError(ErrorCodes.INTERNAL, 'Failed to verify account status', {
+      |           ^
+   98 |       cause: error,
+   99 |     })
+  100 |   } {
+  code: 'INTERNAL',
+  statusCode: 500,
+  context: undefined,
+  userMessage: undefined,
+  digest: '3132680670',
+  [cause]: {
+    message: 'TypeError: fetch failed',
+    details: 'TypeError: fetch failed\n' +
+      '\n' +
+      'Caused by: Error: getaddrinfo ENOTFOUND nvxadsbsbublkbszrtuy.supabase.co (ENOTFOUND)\n' +
+      'Error: getaddrinfo ENOTFOUND nvxadsbsbublkbszrtuy.supabase.co\n' +
+      '    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)\n' +
+      '    at GetAddrInfoReqWrap.callbackTrampoline (node:internal/async_hooks:130:17)',
+    hint: '',
+    code: ''
+  }
+}
+ GET /dashboard/discover 200 in 93s (next.js: 1691ms, proxy.ts: 72s, application-code: 19.3s)
+ GET /manifest.webmanifest 200 in 357ms (next.js: 215ms, application-code: 142ms)
+✓ Compiled in 4.2s
+{"timestamp":"2026-09-21T16:15:04.355Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+{"timestamp":"2026-09-21T16:15:04.622Z","level":"error","message":"Matching config: matching_weights lookup failed; DEFAULTS ARE LIVE","context":{"algorithmVersion":"mmm-rule-v1","weightsVersion":"v1"}}
+{"timestamp":"2026-09-21T16:15:04.623Z","level":"debug","message":"Cache miss / recomputed: matching-weights","context":{"tags":["matching:weights"],"durationMs":713}}
+ GET /dashboard/discover 200 in 13.4s (next.js: 2.2s, proxy.ts: 4.6s, application-code: 6.6s)
+ GET /manifest.webmanifest 200 in 83ms (next.js: 53ms, application-code: 30ms)
+✓ Compiled in 3.2s
+{"timestamp":"2026-09-21T16:18:33.045Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 7.2s (next.js: 673ms, proxy.ts: 2.7s, application-code: 3.8s)
+ GET /manifest.webmanifest 200 in 211ms (next.js: 65ms, application-code: 145ms)
+ GET /dashboard/events 200 in 4.6s (next.js: 943ms, proxy.ts: 3.3s, application-code: 287ms)
+ GET /manifest.webmanifest 200 in 172ms (next.js: 131ms, application-code: 41ms)
+ POST /dashboard/events 200 in 2.8s (next.js: 19ms, proxy.ts: 672ms, application-code: 2.1s)
+  └─ ƒ getHostedEventsAction() in 1165ms app/actions/hosted-events.ts
+ POST /dashboard/events 200 in 1442ms (next.js: 48ms, proxy.ts: 497ms, application-code: 897ms)
+  └─ ƒ getHostedEventsAction() in 827ms app/actions/hosted-events.ts
+ GET /dashboard/connections 200 in 3.2s (next.js: 1252ms, proxy.ts: 1552ms, application-code: 443ms)
+ GET /manifest.webmanifest 200 in 234ms (next.js: 104ms, application-code: 130ms)
+ GET /dashboard/chat 200 in 2.2s (next.js: 834ms, proxy.ts: 1160ms, application-code: 189ms)
+ GET /manifest.webmanifest 200 in 100ms (next.js: 51ms, application-code: 48ms)
+ GET /dashboard/profile 200 in 3.6s (next.js: 2.4s, proxy.ts: 1067ms, application-code: 130ms)
+ GET /manifest.webmanifest 200 in 107ms (next.js: 33ms, application-code: 74ms)
+{"timestamp":"2026-09-21T16:21:50.355Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+{"timestamp":"2026-09-21T16:21:50.430Z","level":"error","message":"Matching config: matching_weights lookup failed; DEFAULTS ARE LIVE","context":{"algorithmVersion":"mmm-rule-v1","weightsVersion":"v1"}}
+{"timestamp":"2026-09-21T16:21:50.434Z","level":"debug","message":"Cache miss / recomputed: matching-weights","context":{"tags":["matching:weights"],"durationMs":374}}
+ GET /dashboard/discover 200 in 11.4s (next.js: 250ms, proxy.ts: 1043ms, application-code: 10.1s)
+ GET /dashboard/events 200 in 1316ms (next.js: 45ms, proxy.ts: 1190ms, application-code: 80ms)
+ GET /dashboard/events 200 in 3.1s (next.js: 41ms, proxy.ts: 2.9s, application-code: 107ms)
+ GET /dashboard/events 200 in 704ms (next.js: 41ms, proxy.ts: 563ms, application-code: 100ms)
+○ Compiling /dashboard/profile/edit ...
+{"timestamp":"2026-09-21T16:22:02.438Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/connections 200 in 2.7s (next.js: 384ms, proxy.ts: 1518ms, application-code: 824ms)
+ GET /dashboard/connections 200 in 2.6s (next.js: 289ms, proxy.ts: 2.2s, application-code: 93ms)
+ GET /dashboard/discover 200 in 6.4s (next.js: 31ms, proxy.ts: 531ms, application-code: 5.9s)
+ GET /dashboard/connections 200 in 790ms (next.js: 78ms, proxy.ts: 519ms, application-code: 194ms)
+ GET /dashboard/connections 200 in 733ms (next.js: 61ms, proxy.ts: 461ms, application-code: 210ms)
+ GET /manifest.webmanifest 200 in 1221ms (next.js: 256ms, application-code: 964ms)
+ GET /dashboard/profile/edit 200 in 7.7s (next.js: 6.1s, proxy.ts: 1357ms, application-code: 182ms)
+ GET /dashboard/profile/edit 200 in 25.6s (next.js: 21.8s, proxy.ts: 3.3s, application-code: 430ms)
+✓ Finished filesystem cache database compaction in 15.4s
+ GET /dashboard/connections 200 in 11.0s (next.js: 3.6s, proxy.ts: 6.9s, application-code: 483ms)
+ GET /dashboard/connections 200 in 7.1s (next.js: 165ms, proxy.ts: 6.2s, application-code: 719ms)
+ GET /manifest.webmanifest 200 in 1174ms (next.js: 364ms, application-code: 810ms)
+ GET /dashboard/events 200 in 14.2s (next.js: 3.3s, proxy.ts: 10.7s, application-code: 242ms)
+ GET /dashboard/chat 200 in 8.1s (next.js: 2.2s, proxy.ts: 4.6s, application-code: 1273ms)
+ GET /dashboard/events 200 in 3.1s (next.js: 36ms, proxy.ts: 2.9s, application-code: 128ms)
+ GET /dashboard/chat 200 in 3.5s (next.js: 41ms, proxy.ts: 3.4s, application-code: 121ms)
+ GET /dashboard/events 200 in 2.7s (next.js: 36ms, proxy.ts: 526ms, application-code: 2.1s)
+ GET /dashboard/events 200 in 2.5s (next.js: 114ms, proxy.ts: 1976ms, application-code: 398ms)
+ GET /manifest.webmanifest 200 in 216ms (next.js: 151ms, application-code: 65ms)
+✓ Compiled in 12.7s
+✓ Compiled in 6.6s
+✓ Compiled in 9.4s
+✓ Compiled in 2.2s
+✓ Compiled in 4.7s
+✓ Compiled in 3.9s
+✓ Compiled in 575ms
+✓ Compiled in 553ms
+✓ Compiled in 1415ms
+✓ Compiled in 2.4s
+✓ Compiled in 1190ms
+✓ Compiled in 5.9s
+✓ Compiled in 1739ms
+✓ Compiled in 2s
+✓ Compiled in 6.1s
+✓ Compiled in 4.9s
+✓ Compiled in 4.3s
+✓ Compiled in 3s
+✓ Compiled in 4.7s
+✓ Compiled in 919ms
+✓ Compiled in 6.1s
+✓ Finished filesystem cache database compaction in 10.7s
+✓ Compiled in 922ms
+✓ Compiled in 3.2s
+✓ Compiled in 780ms
+✓ Compiled in 10.9s
+✓ Compiled in 14s
+ GET /dashboard/chat 200 in 13.4s (next.js: 2.1s, proxy.ts: 10.3s, application-code: 891ms)
+ GET /manifest.webmanifest 200 in 538ms (next.js: 275ms, application-code: 263ms)
+✓ Compiled in 6.9s
+✓ Compiled in 8s
+ GET /dashboard/chat 200 in 15.8s (next.js: 620ms, proxy.ts: 14.9s, application-code: 255ms)
+ GET /dashboard/chat 200 in 5.8s (next.js: 3.7s, proxy.ts: 1163ms, application-code: 957ms)
+✓ Compiled in 6.1s
+ GET /dashboard/chat 200 in 5.0s (next.js: 443ms, proxy.ts: 4.4s, application-code: 132ms)
+ GET /manifest.webmanifest 200 in 123ms (next.js: 61ms, application-code: 62ms)
+ GET /dashboard/events 200 in 14.8s (next.js: 3.6s, proxy.ts: 8.6s, application-code: 2.5s)
+ GET /manifest.webmanifest 200 in 8.7s (next.js: 7.8s, application-code: 838ms)
+ GET /dashboard/connections 200 in 8.8s (next.js: 1919ms, proxy.ts: 6.0s, application-code: 854ms)
+ GET /dashboard/chat 200 in 4.8s (next.js: 806ms, proxy.ts: 3.1s, application-code: 856ms)
+ GET /dashboard/connections 200 in 4.3s (next.js: 801ms, proxy.ts: 2.3s, application-code: 1274ms)
+{"timestamp":"2026-09-21T17:25:53.862Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+{"timestamp":"2026-09-21T17:25:54.314Z","level":"error","message":"Matching config: matching_weights lookup failed; DEFAULTS ARE LIVE","context":{"algorithmVersion":"mmm-rule-v1","weightsVersion":"v1"}}
+{"timestamp":"2026-09-21T17:25:54.318Z","level":"debug","message":"Cache miss / recomputed: matching-weights","context":{"tags":["matching:weights"],"durationMs":2238}}
+ GET /dashboard/connections 200 in 26.3s (next.js: 733ms, proxy.ts: 21.8s, application-code: 3.7s)
+{"timestamp":"2026-09-21T17:25:57.260Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /manifest.webmanifest 200 in 528ms (next.js: 471ms, application-code: 57ms)
+ GET /dashboard/discover 200 in 47s (next.js: 2.5s, proxy.ts: 12.1s, application-code: 31.9s)
+{"timestamp":"2026-09-21T17:25:58.223Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 29.6s (next.js: 396ms, proxy.ts: 2.1s, application-code: 27.2s)
+{"timestamp":"2026-09-21T17:25:59.188Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 30.1s (next.js: 75ms, proxy.ts: 1111ms, application-code: 28.9s)
+ GET /dashboard/discover 200 in 34.2s (next.js: 1071ms, proxy.ts: 1598ms, application-code: 31.6s)
+ GET /dashboard/chat 200 in 4.8s (next.js: 515ms, proxy.ts: 3.7s, application-code: 667ms)
+ GET /manifest.webmanifest 200 in 240ms (next.js: 56ms, application-code: 184ms)
+✓ Compiled in 6.5s
+ GET /dashboard/chat 200 in 3.6s (next.js: 314ms, proxy.ts: 3.1s, application-code: 194ms)
+ GET /dashboard/chat 200 in 503ms (next.js: 49ms, proxy.ts: 394ms, application-code: 61ms)
+ GET /manifest.webmanifest 200 in 273ms (next.js: 36ms, application-code: 237ms)
+ GET /dashboard/chat 200 in 1398ms (next.js: 54ms, proxy.ts: 1263ms, application-code: 81ms)
+ GET /manifest.webmanifest 200 in 22ms (next.js: 9ms, application-code: 13ms)
+✓ Compiled in 2.1s
+ GET /dashboard/chat 200 in 890ms (next.js: 22ms, proxy.ts: 798ms, application-code: 70ms)
+ GET /manifest.webmanifest 200 in 23ms (next.js: 7ms, application-code: 16ms)
+✓ Compiled in 531ms
+ GET /dashboard/chat 200 in 396ms (next.js: 18ms, proxy.ts: 298ms, application-code: 80ms)
+ GET /manifest.webmanifest 200 in 25ms (next.js: 6ms, application-code: 19ms)
+✓ Compiled in 1144ms
+ GET /dashboard/chat 200 in 1302ms (next.js: 61ms, proxy.ts: 1136ms, application-code: 105ms)
+ GET /manifest.webmanifest 200 in 55ms (next.js: 36ms, application-code: 19ms)
+ GET /dashboard/chat 200 in 3.1s (next.js: 179ms, proxy.ts: 2.6s, application-code: 269ms)
+ GET /manifest.webmanifest 200 in 128ms (next.js: 43ms, application-code: 85ms)
+ GET /dashboard/chat 200 in 759ms (next.js: 27ms, proxy.ts: 605ms, application-code: 126ms)
+ GET /manifest.webmanifest 200 in 26ms (next.js: 12ms, application-code: 14ms)
+ GET /dashboard/chat 200 in 559ms (next.js: 27ms, proxy.ts: 274ms, application-code: 258ms)
+ GET /manifest.webmanifest 200 in 87ms (next.js: 37ms, application-code: 50ms)
+✓ Compiled in 8.6s
+ GET /dashboard/chat 200 in 6.2s (next.js: 1273ms, proxy.ts: 4.6s, application-code: 354ms)
+ GET /manifest.webmanifest 200 in 77ms (next.js: 26ms, application-code: 51ms)
+[browser] ./services/chat/chat.service.ts:1:1
+Error: Unexpected character '—'
+> 1 | — explicit ownership metadata for the grant. Match segment binds the grant to this match; u...
+    | ^
+  2 |   const ownership = {
+  3 |     matchId: validated.matchId,
+  4 |     uploaderId: userId,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./services/chat/chat.service.ts
+    ./app/actions/chat.ts 
+[browser] ./services/chat/chat.service.ts:1:1
+Error: Unexpected character '—'
+> 1 | — explicit ownership metadata for the grant. Match segment binds the grant to this match; u...
+    | ^
+  2 |   const ownership = {
+  3 |     matchId: validated.matchId,
+  4 |     uploaderId: userId,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./services/chat/chat.service.ts
+    ./app/actions/chat.ts 
+ GET /dashboard/chat 200 in 4.4s (next.js: 165ms, proxy.ts: 2.4s, application-code: 1856ms)
+ GET /manifest.webmanifest 200 in 109ms (next.js: 33ms, application-code: 77ms)
+ POST /dashboard/chat 200 in 6.9s (next.js: 873ms, proxy.ts: 5.3s, application-code: 666ms)
+  └─ ƒ getOwnProfileAction() in 543ms app/actions/profile-read.ts
+ GET /dashboard/events 200 in 3.0s (next.js: 386ms, proxy.ts: 2.5s, application-code: 128ms)
+ GET /dashboard/events 200 in 410ms (next.js: 18ms, proxy.ts: 310ms, application-code: 82ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /manifest.webmanifest 200 in 54ms (next.js: 17ms, application-code: 37ms)
+ POST /dashboard/chat 200 in 901ms (next.js: 38ms, proxy.ts: 187ms, application-code: 676ms)
+  └─ ƒ getInboxAction({}) in 617ms app/actions/inbox.ts
+ POST /dashboard/events 200 in 1333ms (next.js: 21ms, proxy.ts: 321ms, application-code: 991ms)
+ POST /dashboard/chat 200 in 507ms (next.js: 17ms, proxy.ts: 109ms, application-code: 381ms)
+  └─ ƒ getMatchesAction(undefined) in 350ms app/actions/matches.ts
+ POST /dashboard/events 200 in 827ms (next.js: 15ms, proxy.ts: 275ms, application-code: 536ms)
+ POST /dashboard/events 200 in 662ms (next.js: 10ms, proxy.ts: 273ms, application-code: 379ms)
+  └─ ƒ getOwnProfileAction() in 353ms app/actions/profile-read.ts
+ POST /dashboard/events 200 in 629ms (next.js: 14ms, proxy.ts: 252ms, application-code: 363ms)
+  └─ ƒ getOwnProfileAction() in 341ms app/actions/profile-read.ts
+ POST /dashboard/chat 200 in 651ms (next.js: 17ms, proxy.ts: 90ms, application-code: 544ms)
+  └─ ƒ getInboxAction({}) in 515ms app/actions/inbox.ts
+ POST /dashboard/events 200 in 960ms (next.js: 9ms, proxy.ts: 271ms, application-code: 680ms)
+ POST /dashboard/chat 200 in 486ms (next.js: 13ms, proxy.ts: 122ms, application-code: 352ms)
+  └─ ƒ getMatchesAction(undefined) in 326ms app/actions/matches.ts
+ POST /dashboard/events 200 in 784ms (next.js: 14ms, proxy.ts: 263ms, application-code: 507ms)
+ POST /dashboard/events 200 in 632ms (next.js: 11ms, proxy.ts: 265ms, application-code: 356ms)
+  └─ ƒ getOwnProfileAction() in 326ms app/actions/profile-read.ts
+ POST /dashboard/events 200 in 734ms (next.js: 18ms, proxy.ts: 295ms, application-code: 420ms)
+  └─ ƒ getHostedEventsAction() in 389ms app/actions/hosted-events.ts
+ POST /dashboard/events 200 in 1343ms (next.js: 23ms, proxy.ts: 869ms, application-code: 451ms)
+  └─ ƒ getHostedEventsAction() in 406ms app/actions/hosted-events.ts
+ GET /dashboard/connections 200 in 1674ms (next.js: 441ms, proxy.ts: 1015ms, application-code: 218ms)
+ GET /manifest.webmanifest 200 in 194ms (next.js: 95ms, application-code: 100ms)
+ GET /dashboard/connections 200 in 847ms (next.js: 97ms, proxy.ts: 464ms, application-code: 286ms)
+ GET /manifest.webmanifest 200 in 130ms (next.js: 71ms, application-code: 60ms)
+ POST /dashboard/connections 200 in 2.2s (next.js: 153ms, proxy.ts: 935ms, application-code: 1066ms)
+  └─ ƒ getConnectionFeedAction() in 967ms app/actions/connection-feed.ts
+ POST /dashboard/connections 200 in 2.9s (next.js: 47ms, proxy.ts: 1976ms, application-code: 920ms)
+  └─ ƒ getConnectionFeedAction() in 852ms app/actions/connection-feed.ts
+ GET /dashboard/chat 200 in 676ms (next.js: 16ms, proxy.ts: 575ms, application-code: 85ms)
+ GET /manifest.webmanifest 200 in 77ms (next.js: 50ms, application-code: 27ms)
+ POST /dashboard/chat 200 in 985ms (next.js: 19ms, proxy.ts: 432ms, application-code: 535ms)
+  └─ ƒ getInboxAction({}) in 503ms app/actions/inbox.ts
+ POST /dashboard/chat 200 in 772ms (next.js: 14ms, proxy.ts: 403ms, application-code: 355ms)
+  └─ ƒ getMatchesAction(undefined) in 323ms app/actions/matches.ts
+ POST /dashboard/chat 200 in 790ms (next.js: 12ms, proxy.ts: 265ms, application-code: 513ms)
+  └─ ƒ getOwnProfileAction() in 483ms app/actions/profile-read.ts
+ POST /dashboard/chat 200 in 1134ms (next.js: 42ms, proxy.ts: 285ms, application-code: 807ms)
+  └─ ƒ getInboxAction({}) in 711ms app/actions/inbox.ts
+ POST /dashboard/discover 200 in 1214ms (next.js: 44ms, proxy.ts: 508ms, application-code: 662ms)
+  └─ ƒ getMatchesAction(undefined) in 552ms app/actions/matches.ts
+{"timestamp":"2026-09-21T18:12:42.986Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+{"timestamp":"2026-09-21T18:12:43.385Z","level":"error","message":"Matching config: matching_weights lookup failed; DEFAULTS ARE LIVE","context":{"algorithmVersion":"mmm-rule-v1","weightsVersion":"v1"}}
+{"timestamp":"2026-09-21T18:12:43.386Z","level":"debug","message":"Cache miss / recomputed: matching-weights","context":{"tags":["matching:weights"],"durationMs":1829}}
+ GET /dashboard/discover 200 in 10.9s (next.js: 624ms, proxy.ts: 369ms, application-code: 9.9s)
+ POST /dashboard/discover 200 in 9.3s (next.js: 1267ms, proxy.ts: 418ms, application-code: 7.7s)
+  └─ ƒ getOwnProfileAction() in 6142ms app/actions/profile-read.ts
+{"timestamp":"2026-09-21T18:12:53.548Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 13.8s (next.js: 855ms, proxy.ts: 7.8s, application-code: 5.1s)
+{"timestamp":"2026-09-21T18:12:57.208Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 7.4s (next.js: 59ms, proxy.ts: 774ms, application-code: 6.5s)
+{"timestamp":"2026-09-21T18:13:03.800Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 9.6s (next.js: 478ms, proxy.ts: 523ms, application-code: 8.6s)
+{"timestamp":"2026-09-21T18:13:06.085Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+{"timestamp":"2026-09-21T18:13:06.783Z","level":"debug","message":"Stampede guard: computed + warmed matching-weights"}
+ GET /dashboard/discover 200 in 10.3s (next.js: 1709ms, proxy.ts: 2.6s, application-code: 5.9s)
+ GET /dashboard/profile 200 in 981ms (next.js: 428ms, proxy.ts: 380ms, application-code: 173ms)
+ GET /dashboard/discover 200 in 10.6s (next.js: 744ms, proxy.ts: 4.0s, application-code: 5.9s)
+ GET /dashboard/discover 200 in 10.8s (next.js: 262ms, proxy.ts: 3.2s, application-code: 7.3s)
+ GET /manifest.webmanifest 200 in 505ms (next.js: 346ms, application-code: 159ms)
+ GET /dashboard/profile 200 in 4.2s (next.js: 586ms, proxy.ts: 1825ms, application-code: 1819ms)
+ GET /manifest.webmanifest 200 in 52ms (next.js: 37ms, application-code: 15ms)
+ POST /dashboard/profile 200 in 9.3s (next.js: 234ms, proxy.ts: 3.2s, application-code: 5.9s)
+  └─ ƒ getOwnProfileAction() in 2436ms app/actions/profile-read.ts
+ POST /dashboard/profile 200 in 1120ms (next.js: 109ms, proxy.ts: 563ms, application-code: 449ms)
+  └─ ƒ getOwnProfileAction() in 414ms app/actions/profile-read.ts
+ POST /dashboard/profile 200 in 1058ms (next.js: 21ms, proxy.ts: 523ms, application-code: 514ms)
+  └─ ƒ getOwnProfileAction() in 490ms app/actions/profile-read.ts
+ POST /dashboard/profile 200 in 651ms (next.js: 24ms, proxy.ts: 275ms, application-code: 352ms)
+  └─ ƒ getOwnProfileAction() in 323ms app/actions/profile-read.ts
+ GET /dashboard/events 200 in 3.7s (next.js: 768ms, proxy.ts: 2.4s, application-code: 482ms)
+ GET /dashboard/connections 200 in 1191ms (next.js: 526ms, proxy.ts: 445ms, application-code: 221ms)
+ GET /dashboard/connections 200 in 684ms (next.js: 25ms, proxy.ts: 443ms, application-code: 216ms)
+ GET /dashboard/events 200 in 689ms (next.js: 34ms, proxy.ts: 553ms, application-code: 102ms)
+ GET /dashboard/connections 200 in 479ms (next.js: 16ms, proxy.ts: 383ms, application-code: 80ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /manifest.webmanifest 200 in 443ms (next.js: 358ms, application-code: 86ms)
+ POST /dashboard/connections 200 in 2.3s (next.js: 18ms, proxy.ts: 1487ms, application-code: 755ms)
+  └─ ƒ getConnectionFeedAction() in 722ms app/actions/connection-feed.ts
+ POST /dashboard/connections 200 in 1045ms (next.js: 16ms, proxy.ts: 422ms, application-code: 608ms)
+  └─ ƒ getConnectionFeedAction() in 575ms app/actions/connection-feed.ts
+
+thread 'tokio-rt-worker' (11772) panicked at turbopack\crates\turbo-tasks-backend\src\backend\operation\mod.rs:292:17:
+Restore of All for task TaskId 453051 failed in another thread: restoring failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'tokio-rt-worker' (32932) panicked at turbopack\crates\turbo-tasks-backend\src\backend\operation\mod.rs:292:17:
+Restore of All for task TaskId 931674 failed in another thread: restoring failed
+
+turbo-tasks: an internal panic occurred outside the per-task panic boundary. This is a bug in turbo-tasks/Turbopack — please report it at https://github.com/vercel/next.js/discussions and include the panic message and stack trace above.
+
+Aborting.
+[?25h
