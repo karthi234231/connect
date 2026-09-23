@@ -23,12 +23,24 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/browse', '/privacy', '/terms', '/events/search'],
+        allow: [
+          '/',
+          '/browse',
+          '/privacy',
+          '/terms',
+          '/events',
+          '/events/*',
+          '/events/search',
+          '/profile/*',
+        ],
         disallow: [
           '/api/',
           '/dashboard',
+          '/dashboard/*',
           '/admin',
+          '/admin/*',
           '/settings',
+          '/settings/*',
           '/login',
           '/logout',
           '/callback',
@@ -41,3 +53,4 @@ export default function robots(): MetadataRoute.Robots {
     host: baseUrl,
   }
 }
+

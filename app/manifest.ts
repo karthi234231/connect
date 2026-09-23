@@ -35,9 +35,87 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     shortcuts: [
-      { name: 'Discover', url: '/dashboard' },
-      { name: 'Events', url: '/dashboard/events' },
-      { name: 'Messages', url: '/dashboard/chat' },
+      {
+        name: 'Discover Collaborators',
+        short_name: 'Discover',
+        description: 'Find co-founders, co-builders, and crew by intent.',
+        url: '/dashboard/discover',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+          },
+        ],
+      },
+      {
+        name: 'Explore Events & Meetups',
+        short_name: 'Events',
+        description:
+          'Browse upcoming builder meetups, hackathons, and virtual events.',
+        url: '/events',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+          },
+        ],
+      },
+      {
+        name: 'Share an Idea',
+        short_name: 'New Idea',
+        description:
+          'Post your new idea or project to find early team members.',
+        url: '/dashboard/ideas/new',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+          },
+        ],
+      },
+      {
+        name: 'Direct Messages',
+        short_name: 'Messages',
+        description: 'Chat with matched collaborators and event attendees.',
+        url: '/dashboard/chat',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+          },
+        ],
+      },
+      {
+        name: 'Search Events',
+        short_name: 'Search',
+        description: 'Filter community events by category, format, and city.',
+        url: '/events/search',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+          },
+        ],
+      },
+      {
+        name: 'My Connections',
+        short_name: 'Connections',
+        description: 'View active connections and team relationship momentum.',
+        url: '/dashboard/connections',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+          },
+        ],
+      },
     ],
   }
 }
+

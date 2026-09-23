@@ -1,8 +1,10 @@
 'use client'
 
-import { CalendarDays, Check, MapPin, Plus } from 'lucide-react'
+import { CalendarDays, Check, Download, MapPin, Plus } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/utils/cn'
+import { AvatarGroup, type AvatarGroupItem } from '@/components/ui/avatar-group'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogClose,
@@ -19,6 +21,8 @@ export interface EventDetailDialogProps {
   onOpenChange: (open: boolean) => void
   saved?: boolean
   onSave?: () => void
+  onExportIcs?: () => void
+  attendeeAvatars?: AvatarGroupItem[]
   authState?: 'guest' | 'authed'
   registered?: boolean
   waitlisted?: boolean
@@ -42,6 +46,8 @@ export function EventDetailDialog({
   onOpenChange,
   saved = false,
   onSave,
+  onExportIcs,
+  attendeeAvatars,
   authState = 'authed',
   registered = false,
   waitlisted = false,
@@ -50,6 +56,29 @@ export function EventDetailDialog({
   onRegister,
   children,
 }: EventDetailDialogProps) {
+  const defaultAvatars: AvatarGroupItem[] = Array.from(
+    { length: Math.min(event.attendees || 3, 5) },
+    (_, i) => {
+      const sampleNames = [
+        'Alex Rivera',
+        'Taylor Chen',
+        'Sam Kim',
+        'Jordan Smith',
+        'Morgan Lee',
+      ]
+      const name = sampleNames[i % sampleNames.length]
+      return {
+        alt: name,
+        initials: name
+          .split(' ')
+          .map((n) => n[0])
+          .join(''),
+      }
+    },
+  )
+
+  const avatarsToRender = attendeeAvatars ?? defaultAvatars
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md overflow-hidden p-0">
@@ -77,25 +106,38 @@ export function EventDetailDialog({
             <DialogTitle className="text-2xl leading-tight">
               {event.title}
             </DialogTitle>
-            {onSave ? (
-              <button
-                type="button"
-                onClick={onSave}
-                aria-label={saved ? 'Remove from saved events' : 'Save event'}
-                className={cn(
-                  'flex size-9 shrink-0 items-center justify-center rounded-full border transition',
-                  saved
-                    ? 'border-[var(--cx-brand)] bg-[var(--cx-brand-soft)] text-[var(--cx-brand-strong)]'
-                    : 'border-[var(--cx-border-1)] text-[var(--cx-text-3)] hover:border-[var(--cx-border-2)] hover:text-[var(--cx-text-1)]',
-                )}
-              >
-                {saved ? (
-                  <Check className="size-4" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
-              </button>
-            ) : null}
+            <div className="flex items-center gap-1 shrink-0">
+              {onExportIcs ? (
+                <button
+                  type="button"
+                  onClick={onExportIcs}
+                  aria-label={`Export .ics calendar invite for ${event.title}`}
+                  title="Export .ics calendar invite"
+                  className="flex size-9 items-center justify-center rounded-full border border-[var(--cx-border-1)] text-[var(--cx-text-3)] transition hover:border-[var(--cx-brand)] hover:text-[var(--cx-brand-strong)] hover:bg-[var(--cx-surface-2)]"
+                >
+                  <Download className="size-4" />
+                </button>
+              ) : null}
+              {onSave ? (
+                <button
+                  type="button"
+                  onClick={onSave}
+                  aria-label={saved ? 'Remove from saved events' : 'Save event'}
+                  className={cn(
+                    'flex size-9 shrink-0 items-center justify-center rounded-full border transition',
+                    saved
+                      ? 'border-[var(--cx-brand)] bg-[var(--cx-brand-soft)] text-[var(--cx-brand-strong)]'
+                      : 'border-[var(--cx-border-1)] text-[var(--cx-text-3)] hover:border-[var(--cx-border-2)] hover:text-[var(--cx-text-1)]',
+                  )}
+                >
+                  {saved ? (
+                    <Check className="size-4" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {event.description ? (
@@ -127,10 +169,32 @@ export function EventDetailDialog({
             </div>
           </div>
 
-          <p className="text-xs text-[var(--cx-text-3)]">
-            Hosted by {event.host ?? 'the Connect community'} ·{' '}
-            {event.attendees} of {event.capacity} going
-          </p>
+          {/* Attendee Avatars Preview */}
+          <div className="rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <AvatarGroup items={avatarsToRender} size="sm" max={4} />
+                <div>
+                  <p className="text-xs font-medium text-[var(--cx-text-1)]">
+                    {event.attendees} attendees
+                  </p>
+                  <p className="text-[10px] text-[var(--cx-text-3)]">
+                    Hosted by {event.host ?? 'the Connect community'}
+                  </p>
+                </div>
+              </div>
+              {onExportIcs && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Download className="size-3.5" />}
+                  onClick={onExportIcs}
+                >
+                  .ics
+                </Button>
+              )}
+            </div>
+          </div>
 
           <EventActions
             authState={authState}

@@ -9,3 +9,4 @@ export type {
   ComposerConnectionState,
   ComposerSendDraft,
 } from './MessageComposer'
+export { MediaLightbox } from './media-lightbox'

@@ -36,6 +36,11 @@ import {
   type ToggleIdeaReactionInput,
 } from '@/services/ideas/reactions'
 import {
+  getIdeaRevisions,
+  type IdeaRevisionDTO,
+} from '@/services/ideas/revisions'
+export type { IdeaRevisionDTO }
+import {
   requestJoinSchema,
   reviewJoinSchema,
   submitIdeaSchema,
@@ -407,3 +412,18 @@ export async function listIdeaReactionsAction(
 
   return listIdeaReactions(userId, { ideaId: parsed.data })
 }
+
+export async function getIdeaRevisionsAction(
+  ideaId: string,
+): Promise<IdeaRevisionDTO[]> {
+  const userId = await requireUser()
+
+  const parsed = uuidSchema.safeParse(ideaId)
+
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION, 'That idea is not valid.')
+  }
+
+  return getIdeaRevisions(userId, parsed.data)
+}
+

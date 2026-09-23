@@ -11,10 +11,19 @@ import {
   getDismissedSuggestionSourcesAction,
 } from '@/app/actions/chat'
 import {
+  getChatReactions,
   markConversationRead,
+  removeChatReaction,
   sendChatMessage,
+  toggleChatReaction,
   watchMessages,
 } from '@/client/api/chat'
+import {
+  applyReactionToggle,
+  groupReactionsByMessage,
+  type MessageReaction,
+  type ReactionRecord,
+} from '@/lib/chat/reactions'
 import {
   MessageComposer,
   type ComposerSendDraft,
@@ -47,6 +56,8 @@ interface ThreadMessage {
   created_at: string
   sender_id: string
   attachmentUrl?: string | null
+  read_at?: string | null
+  isPending?: boolean
 }
 
 interface ThreadViewProps {
@@ -207,6 +218,7 @@ export function ThreadView({
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [pending, setPending] = useState<ThreadMessage[]>([])
+  const [reactionsData, setReactionsData] = useState<ReactionRecord[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -220,12 +232,61 @@ export function ThreadView({
     created_at: m.created_at,
     sender_id: m.sender_id,
     attachmentUrl: m.attachment_url ?? null,
+    read_at: m.read_at ?? null,
   }))
   const confirmedIds = new Set(serverMessages.map((m) => m.id))
   const visible = [
     ...serverMessages,
     ...pending.filter((p) => !confirmedIds.has(p.id)),
   ]
+
+  useEffect(() => {
+    const messageIds = visible
+      .map((m) => m.id)
+      .filter((id) => !id.startsWith('optimistic-'))
+    if (messageIds.length === 0) return
+    let active = true
+    void getChatReactions(matchId, messageIds)
+      .then((res) => {
+        if (active) setReactionsData(res)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [matchId, visible.length])
+
+  const messageReactionsMap = groupReactionsByMessage(reactionsData, myId)
+
+  const handleToggleReaction = async (
+    messageId: string,
+    emoji: MessageReaction,
+  ) => {
+    const existingSummaries = messageReactionsMap[messageId] ?? []
+    const existingChip = existingSummaries.find((r) => r.emoji === emoji)
+    const isRemoving = existingChip?.reactedByViewer ?? false
+
+    const toggle = {
+      messageId,
+      userId: myId,
+      emoji,
+      active: !isRemoving,
+    }
+    setReactionsData((prev) => applyReactionToggle(prev, toggle))
+
+    try {
+      if (isRemoving) {
+        await removeChatReaction(messageId, emoji)
+      } else {
+        await toggleChatReaction(messageId, emoji)
+      }
+    } catch {
+      setReactionsData((prev) =>
+        applyReactionToggle(prev, { ...toggle, active: isRemoving }),
+      )
+      announce('Could not update reaction. Please try again.')
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -282,6 +343,7 @@ export function ThreadView({
       content,
       created_at: new Date().toISOString(),
       sender_id: myId,
+      isPending: true,
     }
     setPending((prev) => [...prev, optimistic])
     try {
@@ -303,17 +365,32 @@ export function ThreadView({
     }
   }
 
-  const chatMessages: ChatMessage[] = visible.map((m) => ({
-    id: m.id,
-    text: m.content,
-    sent: m.sender_id === myId,
-    time: formatRelativeDate(m.created_at),
-    status: 'sent',
-    attachmentUrl: m.attachmentUrl,
-    attachmentName: m.attachmentUrl
-      ? m.attachmentUrl.split('/').pop() ?? 'Attachment'
-      : null,
-  }))
+  const chatMessages: ChatMessage[] = visible.map((m) => {
+    const isSent = m.sender_id === myId
+    let status: 'sent' | 'read' | 'pending' | undefined = undefined
+    if (isSent) {
+      if (m.isPending) {
+        status = 'pending'
+      } else if (m.read_at) {
+        status = 'read'
+      } else {
+        status = 'sent'
+      }
+    }
+
+    return {
+      id: m.id,
+      text: m.content,
+      sent: isSent,
+      time: formatRelativeDate(m.created_at),
+      status,
+      attachmentUrl: m.attachmentUrl,
+      attachmentName: m.attachmentUrl
+        ? m.attachmentUrl.split('/').pop() ?? 'Attachment'
+        : null,
+      reactions: messageReactionsMap[m.id] ?? [],
+    }
+  })
 
   const body = isLoading ? (
     <LoadingState label="Loading conversation…" />
@@ -332,6 +409,7 @@ export function ThreadView({
             isPeerTyping={connectionState.isPeerTyping}
             peerName={peer?.fullName}
             endRef={bottomRef}
+            onToggleReaction={handleToggleReaction}
           />
         )}
       </div>
@@ -347,6 +425,7 @@ export function ThreadView({
         connectionState={connectionState.state}
         sending={sending}
         matchId={matchId}
+        autoFocus
         onSend={handleSend}
         onError={setSendError}
         onDraftChange={handleDraftChange}

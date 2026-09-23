@@ -9,25 +9,32 @@ export interface StepperStep {
 export interface StepperProps {
   steps: StepperStep[]
   current: number
+  onStepClick?: (index: number) => void
   className?: string
 }
 
-export function Stepper({ steps, current, className }: StepperProps) {
+export function Stepper({ steps, current, onStepClick, className }: StepperProps) {
   return (
     <ol role="list" className={cn('flex items-start', className)}>
       {steps.map((step, index) => {
         const completed = index < current
         const isCurrent = index === current
+        const isInteractive = Boolean(onStepClick)
+
         return (
           <li
             key={step.label}
             aria-current={isCurrent ? 'step' : undefined}
-            className="flex flex-1 flex-col items-center"
+            className={cn(
+              'flex flex-1 flex-col items-center',
+              isInteractive && 'cursor-pointer group',
+            )}
+            onClick={() => onStepClick?.(index)}
           >
             <div className="flex w-full items-center">
               <span
                 className={cn(
-                  'flex size-8 shrink-0 items-center justify-center rounded-full',
+                  'flex size-8 shrink-0 items-center justify-center rounded-full transition',
                   completed &&
                     'bg-[var(--cx-brand)] text-white [&>svg]:text-white',
                   isCurrent &&
@@ -35,6 +42,7 @@ export function Stepper({ steps, current, className }: StepperProps) {
                   !completed &&
                     !isCurrent &&
                     'bg-[var(--cx-surface-3)] text-[var(--cx-text-4)]',
+                  isInteractive && 'group-hover:scale-105',
                 )}
               >
                 {completed ? (
@@ -76,3 +84,4 @@ export function Stepper({ steps, current, className }: StepperProps) {
     </ol>
   )
 }
+

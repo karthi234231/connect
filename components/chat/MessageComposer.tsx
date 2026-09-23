@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Paperclip, Send, X } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import {
@@ -80,6 +80,13 @@ export function MessageComposer({
   } | null>(null)
   const [attaching, setAttaching] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (variant === 'composer' && autoFocus && !disabled) {
+      textInputRef.current?.focus()
+    }
+  }, [variant, autoFocus, disabled, matchId])
 
   if (variant !== 'composer') {
     return (
@@ -133,6 +140,9 @@ export function MessageComposer({
     })
     setDraft('')
     setAttachment(null)
+    setTimeout(() => {
+      textInputRef.current?.focus()
+    }, 0)
   }
 
   const submitReady = canSubmitDraft(
@@ -177,6 +187,7 @@ export function MessageComposer({
         </label>
         <input
           id="chat-composer-input"
+          ref={textInputRef}
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value)
@@ -225,3 +236,4 @@ export function MessageComposer({
 }
 
 export default MessageComposer
+

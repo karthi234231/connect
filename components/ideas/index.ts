@@ -9,3 +9,5 @@ export {
   ideaBriefToItem,
   ideaCardToDeckItem,
 } from './map-to-item'
+export { IdeaRevisionDrawer } from './idea-revision-drawer'
+

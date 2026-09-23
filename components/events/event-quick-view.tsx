@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { fetchGuestEvent, type GuestEventDetail } from '@/client/api/events'
+import { downloadTextFile, fetchGuestEvent, type GuestEventDetail } from '@/client/api/events'
+import { generateEventIcs } from '@/lib/calendar'
 import {
   getGuestRegistrationStatusAction,
   registerForEventAction,
@@ -114,6 +115,19 @@ export function EventQuickView({ eventId, onOpenChange }: EventQuickViewProps) {
     }
   }
 
+  const handleExportIcs = () => {
+    if (!event) return
+    const ics = generateEventIcs({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      location: event.locationOrLink,
+      startsAt: event.startsAt,
+      durationMinutes: event.durationMinutes,
+    })
+    downloadTextFile(`${event.id}.ics`, ics, 'text/calendar')
+  }
+
   if (!event || loadedId !== eventId) return null
 
   return (
@@ -126,6 +140,7 @@ export function EventQuickView({ eventId, onOpenChange }: EventQuickViewProps) {
       waitlisted={isWaitlisted}
       isRegistering={isRegistering}
       loginHref={loginHref}
+      onExportIcs={handleExportIcs}
       onRegister={isRegistered || isWaitlisted ? undefined : handleRegister}
     >
       {isWaitlisted ? (

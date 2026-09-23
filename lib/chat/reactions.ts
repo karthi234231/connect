@@ -8,14 +8,19 @@
 // shared by the service, the realtime protocol, the server action and the UI so
 // they can never drift.
 
+export const QUICK_REACTIONS = ['❤️', '👍', '🚀', '💡'] as const
+export type QuickReaction = (typeof QUICK_REACTIONS)[number]
+
 /**
  * Allowlisted reaction emoji. A fixed set means no arbitrary string can ever
  * reach storage (RULE 024 / §381 input validation) and keeps the chip row
  * bounded regardless of client behaviour.
  */
 export const MESSAGE_REACTIONS = [
-  '👍',
   '❤️',
+  '👍',
+  '🚀',
+  '💡',
   '😂',
   '🎉',
   '🙌',
