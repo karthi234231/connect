@@ -4,7 +4,6 @@ import { createServerClient } from '@supabase/ssr'
 import { env } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { POST_LOGIN_ROUTE } from '@/lib/auth-redirect'
-import { buildCspHeader, generateCspNonce } from '@/lib/security'
 import { isSafeRedirectUrl } from '@/lib/redirect'
 import {
   authIpRatelimit,
@@ -124,25 +123,7 @@ async function handleProxy(request: NextRequest, requestId: string) {
   const path = request.nextUrl.pathname
   const method = request.method
 
-  const cspNonce = generateCspNonce()
-  const forwardedHeaders = new Headers(request.headers)
-  forwardedHeaders.set('x-nonce', cspNonce)
-  forwardedHeaders.set('x-csp-nonce', cspNonce)
-
-  const nextWithNonce = () => {
-    const nextResponse = NextResponse.next({
-      request: { headers: forwardedHeaders },
-    })
-    nextResponse.headers.set(
-      'Content-Security-Policy',
-      buildCspHeader(cspNonce),
-    )
-    nextResponse.headers.set(
-      'Reporting-Endpoints',
-      'csp-endpoint="/api/security/csp-report"',
-    )
-    return nextResponse
-  }
+  const passThrough = () => NextResponse.next()
 
   // Degraded pass-through: when the app isn't configured (no .env.local, e.g.
   // local demo/dev shells), the auth gateway below cannot run — instantiating
@@ -154,10 +135,10 @@ async function handleProxy(request: NextRequest, requestId: string) {
     typeof process.env.NEXT_PUBLIC_SUPABASE_URL !== 'string' ||
     typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'string'
   ) {
-    return nextWithNonce()
+    return passThrough()
   }
 
-  let response = nextWithNonce()
+  let response = passThrough()
 
   const supabase = createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -171,7 +152,7 @@ async function handleProxy(request: NextRequest, requestId: string) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           )
-          response = nextWithNonce()
+          response = passThrough()
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           )

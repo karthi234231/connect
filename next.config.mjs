@@ -58,6 +58,7 @@ const imgSrc = [
   supabaseOrigin, // avatars/event media served from Storage
   'https://*.licdn.com', // LinkedIn imagery surfaced on profiles
   'https://*.licdn.cn',
+  'https://randomuser.me', // seeded demo avatars
 ].filter(Boolean)
 
 if (isDev) {
@@ -94,7 +95,7 @@ const securityHeaders = [
   {
     key: 'Permissions-Policy',
     value:
-      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), magnetometer=(), gyroscope=(), interest-cohort=()',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), magnetometer=(), gyroscope=()',
   },
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
   { key: 'Cross-Origin-Resource-Policy', value: 'same-site' },
@@ -131,6 +132,7 @@ const nextConfig = {
         pathname: '/storage/**',
       },
       { protocol: 'https', hostname: '**.licdn.com' },
+      { protocol: 'https', hostname: 'randomuser.me' },
     ],
   },
   async headers() {

@@ -176,8 +176,3 @@ export async function getGuestRegistrationStatusAction(input: {
   }
 }
 
-export {
-  createHostedEventAction,
-  createHostedEventAction as createEventAction,
-} from './hosted-events'
-
