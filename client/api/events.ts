@@ -78,6 +78,7 @@ export interface PublicEventCard {
   capacity: number
   attendeeCount: number
   tags: string[]
+  category?: string | null
 }
 
 export interface PublicEventsPage {
@@ -145,6 +146,8 @@ export interface GuestEventDetail {
   spotsRemaining: number | null
   isFull: boolean | null
   registrationOpen: boolean | null
+  organizerName?: string | null
+  organizerAvatarUrl?: string | null
 }
 
 export async function fetchGuestEvent(

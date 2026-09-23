@@ -21,6 +21,14 @@ export type Person = {
   score?: number
   /** Optional explainability factors rendered alongside the score badge. */
   factors?: { label: string; value: number }[]
+  /** Optional categories/skills offered. */
+  offering?: string[]
+  /** Optional roles/skills sought. */
+  lookingFor?: string[]
+  /** Optional skill overlaps between current user and candidate. */
+  skillOverlap?: string[]
+  /** Optional intent badges resolved via intent taxonomy. */
+  intentBadges?: { label: string; type: 'offering' | 'lookingFor' }[]
 }
 
 /** First letters of the first two words of a name, uppercase. */

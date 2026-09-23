@@ -1,6 +1,7 @@
 export * from './education-card'
 export * from './experience-card'
 export * from './interests-editor'
+export * from './profile-card'
 export * from './profile-header'
 export * from './profile-section'
 export * from './settings-group'

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Paperclip, Plus, Maximize2 } from 'lucide-react'
+import { Check, CheckCheck, Clock, Paperclip, Plus, Maximize2 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import {
   MESSAGE_REACTIONS,
@@ -10,12 +10,6 @@ import {
   type ReactionSummary,
 } from '@/lib/chat/reactions'
 import { MediaLightbox } from './media-lightbox'
-
-const STATUS_GLYPH: Record<'sent' | 'read' | 'pending', string> = {
-  sent: '\u2713',
-  read: '\u2713\u2713',
-  pending: '\u00b7\u00b7\u00b7',
-}
 
 const STATUS_LABEL: Record<'sent' | 'read' | 'pending', string> = {
   sent: 'Sent',
@@ -224,12 +218,18 @@ export function MessageBubble({
                 <span
                   title={STATUS_LABEL[status]}
                   className={cn(
-                    'inline-flex items-center font-medium tracking-tighter',
-                    status === 'read' ? 'text-sky-200 font-bold' : 'text-white/70',
+                    'inline-flex items-center font-medium',
+                    status === 'read' ? 'text-sky-200' : 'text-white/70',
                   )}
                 >
                   <span className="sr-only">{STATUS_LABEL[status]}</span>
-                  <span aria-hidden="true">{STATUS_GLYPH[status]}</span>
+                  {status === 'read' ? (
+                    <CheckCheck className="size-3.5 text-sky-200" aria-hidden="true" />
+                  ) : status === 'sent' ? (
+                    <Check className="size-3.5 text-white/70" aria-hidden="true" />
+                  ) : (
+                    <Clock className="size-3 animate-spin text-white/70" aria-hidden="true" />
+                  )}
                 </span>
               ) : null}
             </div>

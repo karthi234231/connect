@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useTheme } from '@teispace/next-themes'
 import {
   AlertTriangle,
   Bell,
@@ -10,10 +11,12 @@ import {
   Globe,
   Lock,
   MessageSquare,
+  Moon,
   Palette,
   ShieldAlert,
   ShieldBan,
   Sparkles,
+  Sun,
   UserRound,
   UsersRound,
 } from 'lucide-react'
@@ -47,11 +50,14 @@ import {
   fetchPrivacySettings,
   updateNotificationSettings,
   updatePrivacySettings,
-  type NotificationToggleFlags,
   type PrivacyFlags,
 } from '@/client/api/settings'
+import type { NotificationToggleFlags } from '@/app/dashboard/settings/notification-model'
 import { useQuery, queryClient } from '@/client/query/client'
+import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
+
+const APPEARANCE_STORAGE_KEY = 'connect:appearance'
 
 const sections = [
   {
@@ -99,6 +105,14 @@ const sections = [
 ]
 
 export default function SettingsPage() {
+  // Theme & Appearance state
+  const { theme, setTheme, resolvedTheme } = useTheme()
+  const isDarkMode = theme === 'dark' || resolvedTheme === 'dark'
+  const [appearanceFlags, setAppearanceFlags] = useLocalStorage(APPEARANCE_STORAGE_KEY, {
+    compact: false,
+    motion: false,
+  })
+
   // Notification Quick Settings State
   const notifQueryKey = 'settings/notifications'
   const { data: notifData, isLoading: notifLoading } = useQuery(notifQueryKey, () =>
@@ -149,7 +163,7 @@ export default function SettingsPage() {
     setNotifFlags(next)
     const res = await updateNotificationSettings(next)
     if (!res.ok) {
-      setNotifFlags((prev) => ({ ...prev, [key]: !checked }))
+      setNotifFlags((prev: NotificationToggleFlags) => ({ ...prev, [key]: !checked }))
       showErrorToast(res.error ?? 'Failed to update notification settings.')
     } else {
       showSuccessToast('Notification preference updated')
@@ -165,7 +179,7 @@ export default function SettingsPage() {
     setPrivacyFlags(next)
     const res = await updatePrivacySettings(next)
     if (!res.ok) {
-      setPrivacyFlags((prev) => ({ ...prev, [key]: !checked }))
+      setPrivacyFlags((prev: PrivacyFlags) => ({ ...prev, [key]: !checked }))
       showErrorToast(res.error ?? 'Failed to update privacy settings.')
     } else {
       showSuccessToast(
@@ -177,6 +191,16 @@ export default function SettingsPage() {
       )
       queryClient.invalidate(privacyQueryKey)
     }
+  }
+
+  function handleToggleDarkMode(checked: boolean) {
+    setTheme(checked ? 'dark' : 'light')
+    showSuccessToast(checked ? 'Dark mode enabled' : 'Light mode enabled')
+  }
+
+  function handleToggleCompact(checked: boolean) {
+    setAppearanceFlags({ ...appearanceFlags, compact: checked })
+    showSuccessToast(checked ? 'Compact view enabled' : 'Standard view enabled')
   }
 
   async function handleDeactivateAccount() {
@@ -203,7 +227,7 @@ export default function SettingsPage() {
         <PageHeader
           eyebrow="Preferences & Governance"
           title="Settings"
-          description="Manage your account, privacy, notifications, and network preferences."
+          description="Manage your account, privacy, notifications, appearance, and network preferences."
         />
 
         {/* Section Navigation Cards */}
@@ -228,9 +252,9 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* Quick Settings Widgets */}
+        {/* Quick Settings Grid */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Quick Notification Controls */}
+          {/* 1. Quick Notification Controls */}
           <Card>
             <CardHeader className="border-b border-[var(--cx-border-1)] pb-4">
               <div className="flex items-center justify-between">
@@ -303,12 +327,87 @@ export default function SettingsPage() {
                       }
                     />
                   </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--cx-surface-2)]">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--cx-text-1)]">
+                        Product news &amp; updates
+                      </p>
+                      <p className="text-[11px] text-[var(--cx-text-3)]">
+                        Monthly summary of new feature releases.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifFlags.updates}
+                      onCheckedChange={(checked) =>
+                        void handleToggleNotif('updates', checked)
+                      }
+                    />
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Quick Privacy Controls & Deactivation Modal Trigger */}
+          {/* 2. Quick Appearance Controls */}
+          <Card>
+            <CardHeader className="border-b border-[var(--cx-border-1)] pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Palette className="size-4 text-[var(--cx-brand-strong)]" />
+                  <CardTitle className="text-base">Appearance &amp; Theme</CardTitle>
+                </div>
+                <Link href={ROUTES.settingsAppearance}>
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    View all
+                  </Button>
+                </Link>
+              </div>
+              <CardDescription>
+                Customize theme, color density, and motion preferences.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--cx-surface-2)]">
+                <div className="flex items-center gap-2.5">
+                  {isDarkMode ? (
+                    <Moon className="size-4 text-[var(--cx-brand-strong)] shrink-0" />
+                  ) : (
+                    <Sun className="size-4 text-amber-500 shrink-0" />
+                  )}
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--cx-text-1)]">
+                      Dark Mode Theme
+                    </p>
+                    <p className="text-[11px] text-[var(--cx-text-3)]">
+                      Switch between dark-first and light mode interface.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={isDarkMode}
+                  onCheckedChange={handleToggleDarkMode}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--cx-surface-2)]">
+                <div>
+                  <p className="text-xs font-semibold text-[var(--cx-text-1)]">
+                    Compact View Density
+                  </p>
+                  <p className="text-[11px] text-[var(--cx-text-3)]">
+                    Reduce padding and card spacing for higher screen density.
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(appearanceFlags.compact)}
+                  onCheckedChange={handleToggleCompact}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 3. Quick Privacy Controls */}
           <Card>
             <CardHeader className="border-b border-[var(--cx-border-1)] pb-4">
               <div className="flex items-center justify-between">
@@ -322,10 +421,10 @@ export default function SettingsPage() {
                 />
               </div>
               <CardDescription>
-                Manage public discoverability and account presence.
+                Manage public discoverability and profile permissions.
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
+            <CardContent className="p-4 space-y-3">
               {privacyLoading ? (
                 <LoadingState label="Loading privacy status…" />
               ) : (
@@ -333,7 +432,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--cx-surface-2)]">
                     <div>
                       <p className="text-xs font-semibold text-[var(--cx-text-1)]">
-                        Public profile visibility
+                        Public Profile Visibility
                       </p>
                       <p className="text-[11px] text-[var(--cx-text-3)]">
                         Allow people outside your network to find your profile.
@@ -347,28 +446,83 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="rounded-xl border border-[var(--cx-danger)]/30 bg-[var(--cx-danger-soft)]/20 p-4 space-y-3">
-                    <div className="flex items-start gap-2.5">
-                      <ShieldAlert className="size-4 text-[var(--cx-danger)] shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-[var(--cx-text-1)]">
-                          Deactivate or Pause Profile
-                        </p>
-                        <p className="text-[11px] text-[var(--cx-text-3)] mt-0.5">
-                          Need a break? Temporarily hide your profile from search and matching decks.
-                        </p>
-                      </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--cx-surface-2)]">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--cx-text-1)]">
+                        Online Activity Indicator
+                      </p>
+                      <p className="text-[11px] text-[var(--cx-text-3)]">
+                        Show active status to verified connections.
+                      </p>
                     </div>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => setIsDeactivateModalOpen(true)}
-                    >
-                      Deactivate profile…
-                    </Button>
+                    <Switch
+                      checked={privacyFlags.status}
+                      onCheckedChange={(checked) =>
+                        void handleTogglePrivacy('status', checked)
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--cx-surface-2)]">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--cx-text-1)]">
+                        Accept Connection Requests
+                      </p>
+                      <p className="text-[11px] text-[var(--cx-text-3)]">
+                        Allow incoming connection requests from non-matched profiles.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={privacyFlags.requests}
+                      onCheckedChange={(checked) =>
+                        void handleTogglePrivacy('requests', checked)
+                      }
+                    />
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* 4. Account Management & Deactivation */}
+          <Card>
+            <CardHeader className="border-b border-[var(--cx-border-1)] pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserRound className="size-4 text-[var(--cx-brand-strong)]" />
+                  <CardTitle className="text-base">Account Management</CardTitle>
+                </div>
+                <Link href={ROUTES.settingsAccount}>
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    Account Details
+                  </Button>
+                </Link>
+              </div>
+              <CardDescription>
+                Pause, deactivate, or manage your account presence.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="rounded-xl border border-[var(--cx-danger)]/30 bg-[var(--cx-danger-soft)]/20 p-4 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <ShieldAlert className="size-4 text-[var(--cx-danger)] shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--cx-text-1)]">
+                      Deactivate or Pause Profile
+                    </p>
+                    <p className="text-[11px] text-[var(--cx-text-3)] mt-0.5">
+                      Need a break? Temporarily hide your profile from search, Discover, and matching decks.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setIsDeactivateModalOpen(true)}
+                >
+                  Deactivate Profile…
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -161,6 +161,12 @@ export async function listActionableNotifications(): Promise<
   }))
 }
 
+export async function markNotificationAsReadAction(id: string): Promise<void> {
+  const userId = await requireUser()
+  const repo = await notificationsRepo()
+  await repo.markAsRead(id, userId)
+}
+
 export async function markAllNotificationsRead(): Promise<void> {
   const userId = await requireUser()
   const repo = await notificationsRepo()

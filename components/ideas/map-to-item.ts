@@ -33,6 +33,10 @@ export function ideaCardToItem(idea: IdeaCardDTO): Idea {
     approach: idea.solution,
     meta: metaLine(idea.stage, idea.validationCount),
     tag: stageLabel(idea.stage),
+    teamNeeded: idea.teamNeeded,
+    tags: idea.tags,
+    joinEnabled: idea.joinEnabled,
+    upvotesCount: idea.validationCount,
   }
 }
 
@@ -50,6 +54,10 @@ export function ideaCardToDeckItem(idea: IdeaCardDTO): Idea {
     approach: idea.solution,
     meta: metaLine(idea.stage, idea.validationCount),
     tag: stageLabel(idea.stage),
+    teamNeeded: idea.teamNeeded,
+    tags: idea.tags,
+    joinEnabled: idea.joinEnabled,
+    upvotesCount: idea.validationCount,
   }
 }
 
@@ -65,5 +73,10 @@ export function ideaBriefToItem(idea: IdeaBrief): Idea {
     approach: idea.solution,
     meta: metaLine(idea.stage, idea.validation_count),
     tag: stageLabel(idea.stage),
+    teamNeeded: idea.team_needed ?? [],
+    tags: idea.tags ?? [],
+    joinEnabled: true,
+    upvotesCount: idea.validation_count,
   }
 }
+

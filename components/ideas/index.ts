@@ -10,4 +10,6 @@ export {
   ideaCardToDeckItem,
 } from './map-to-item'
 export { IdeaRevisionDrawer } from './idea-revision-drawer'
+export { IdeaFeedbackComments } from './idea-feedback-comments'
+
 

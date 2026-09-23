@@ -32,5 +32,8 @@ export type EventCardData = Pick<
 
 export type EventBrief = Pick<
   EventRow,
-  'id' | 'title' | 'starts_at' | 'timezone' | 'location_or_link' | 'format'
->
+  'id' | 'title' | 'starts_at' | 'timezone' | 'location_or_link' | 'format' | 'type' | 'capacity'
+> & {
+  attendeeCount?: number
+}
+

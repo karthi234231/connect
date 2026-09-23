@@ -8,4 +8,11 @@ export type Idea = {
   approach: string
   meta: string
   tag?: string
+  teamNeeded?: string[]
+  tags?: string[]
+  joinEnabled?: boolean
+  upvotesCount?: number
+  isUpvoted?: boolean
+  commentCount?: number
 }
+

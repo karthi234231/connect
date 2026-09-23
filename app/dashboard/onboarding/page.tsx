@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   Check,
   CheckCircle2,
+  Compass,
   Image as ImageIcon,
   Sparkles,
   Upload,
@@ -19,6 +20,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -36,6 +38,7 @@ import {
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { cn } from '@/utils/cn'
+import { ROUTES } from '@/config/routes'
 import { getOwnProfileAction } from '@/app/actions/profile-read'
 import {
   completeOnboardingAction,
@@ -56,6 +59,13 @@ import { useQuery } from '@/client/query/client'
 import { initialsForName } from '@/types/profile'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
 
+const HEADLINE_SUGGESTIONS = [
+  'Founder building AI tools for builders',
+  'Fullstack Engineer looking for co-founder',
+  'Product Designer exploring early-stage teams',
+  'Growth Strategist scaling B2B SaaS',
+]
+
 export default function OnboardingPage() {
   const router = useRouter()
   const [profileKey] = useState(() => ['own-profile', 'onboarding'].join('/'))
@@ -71,7 +81,7 @@ export default function OnboardingPage() {
   const [headlineInput, setHeadlineInput] = useState('')
   const [selectedLookingFor, setSelectedLookingFor] = useState<string[]>([])
   const [selectedOffering, setSelectedOffering] = useState<string[]>([])
-  
+
   // Avatar handling state
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
@@ -98,7 +108,7 @@ export default function OnboardingPage() {
     }
   }, [profile])
 
-  // Handle local avatar file preview
+  // Instant local avatar preview
   useEffect(() => {
     if (!avatarFile) return
     const objectUrl = URL.createObjectURL(avatarFile)
@@ -133,7 +143,7 @@ export default function OnboardingPage() {
     {
       num: 4,
       title: 'Review and finish',
-      body: "Preview your profile and go live.",
+      body: 'Preview your profile and go live.',
       done: isCompleted,
     },
   ]
@@ -255,6 +265,14 @@ export default function OnboardingPage() {
     }
   }
 
+  async function handleStepClick(targetStep: number) {
+    if (targetStep === activeStep || savingStep) return
+    const success = await saveStep(activeStep)
+    if (success) {
+      setActiveStep(targetStep)
+    }
+  }
+
   async function handleNextStep() {
     const success = await saveStep(activeStep)
     if (success && activeStep < steps.length) {
@@ -284,7 +302,7 @@ export default function OnboardingPage() {
     }
     await refetch().catch(() => undefined)
     showSuccessToast('Your profile is live!')
-    router.push('/dashboard/profile')
+    router.push(ROUTES.discover)
   }
 
   function toggleLookingForRole(val: string) {
@@ -314,12 +332,12 @@ export default function OnboardingPage() {
           <ErrorState onRetry={() => void refetch()} />
         ) : (
           <>
-            {/* Interactive Stepper Navigation Header */}
+            {/* Interactive Stepper & Step Progress Bar */}
             <div className="mb-6 rounded-2xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] p-4 shadow-xs">
               <Stepper
                 steps={steps.map((s) => ({ label: s.title }))}
                 current={activeStep - 1}
-                onStepClick={(index: number) => setActiveStep(index + 1)}
+                onStepClick={(index: number) => void handleStepClick(index + 1)}
               />
 
               <div className="mt-4 pt-3 border-t border-[var(--cx-border-1)]">
@@ -358,11 +376,11 @@ export default function OnboardingPage() {
                 {/* STEP 1: Bio & Avatar */}
                 {activeStep === 1 && (
                   <div className="space-y-5">
-                    {/* Avatar Upload / Preview Box */}
+                    {/* Instant Avatar Upload / Dropzone */}
                     <div className="rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-semibold uppercase tracking-wider text-[var(--cx-text-4)] flex items-center gap-1.5">
-                          <ImageIcon className="size-3.5" /> Profile Photo
+                          <ImageIcon className="size-3.5 text-[var(--cx-brand-strong)]" /> Instant Profile Photo Preview
                         </label>
                         {avatarPreviewUrl ? (
                           <Button
@@ -378,7 +396,7 @@ export default function OnboardingPage() {
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <Avatar className="size-16 shrink-0 ring-2 ring-[var(--cx-border-1)]">
+                        <Avatar className="size-16 shrink-0 ring-2 ring-[var(--cx-brand)] shadow-md">
                           {avatarPreviewUrl ? (
                             <AvatarImage src={avatarPreviewUrl} alt="Avatar Preview" />
                           ) : null}
@@ -387,7 +405,9 @@ export default function OnboardingPage() {
                           </AvatarFallback>
                         </Avatar>
                         <div className="text-xs text-[var(--cx-text-3)] leading-relaxed">
-                          <p className="font-medium text-[var(--cx-text-1)]">Upload your profile photo</p>
+                          <p className="font-medium text-[var(--cx-text-1)]">
+                            {avatarFile ? 'Ready to upload preview photo' : 'Upload your profile photo'}
+                          </p>
                           <p>PNG, JPG or WebP up to 10 MB. High quality headshots convert 3x better.</p>
                         </div>
                       </div>
@@ -400,8 +420,8 @@ export default function OnboardingPage() {
                         }}
                         accept="image/png,image/jpeg,image/webp"
                         multiple={false}
-                        label="Drop image or click to select"
-                        hint="PNG, JPG or WebP"
+                        label="Drop photo here or click to choose file"
+                        hint="Instant image preview enabled"
                         disabled={avatarBusy}
                       />
 
@@ -412,7 +432,7 @@ export default function OnboardingPage() {
                             disabled={avatarBusy}
                             onClick={() => void handleAvatarUpload()}
                           >
-                            {avatarBusy ? 'Uploading photo…' : 'Upload photo'}
+                            {avatarBusy ? 'Uploading photo…' : 'Save Photo Now'}
                           </Button>
                           <Button
                             variant="ghost"
@@ -435,7 +455,7 @@ export default function OnboardingPage() {
                       )}
                     </div>
 
-                    {/* Bio & Headline */}
+                    {/* Bio & Headline with Smart Suggestions */}
                     <div className="space-y-4">
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--cx-text-4)]">
@@ -446,6 +466,21 @@ export default function OnboardingPage() {
                           value={headlineInput}
                           onChange={(e) => setHeadlineInput(e.target.value)}
                         />
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] text-[var(--cx-text-4)] uppercase font-semibold">
+                            Suggestions:
+                          </span>
+                          {HEADLINE_SUGGESTIONS.map((sug) => (
+                            <button
+                              key={sug}
+                              type="button"
+                              onClick={() => setHeadlineInput(sug)}
+                              className="rounded-full bg-[var(--cx-surface-2)] px-2.5 py-0.5 text-[11px] text-[var(--cx-text-2)] border border-[var(--cx-border-1)] hover:border-[var(--cx-brand-soft)] hover:text-[var(--cx-brand-strong)] transition-colors"
+                            >
+                              {sug}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       <div>
@@ -466,12 +501,44 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
-                {/* STEP 2: Match Interests */}
+                {/* STEP 2: Match Interests with Preset Skill Chips */}
                 {activeStep === 2 && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-[var(--cx-text-3)] leading-relaxed">
-                      Select the primary roles and disciplines you are looking to match or team up with (up to 5):
-                    </p>
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-xs text-[var(--cx-text-3)] leading-relaxed mb-3">
+                        Select the primary roles and disciplines you want to match or team up with (up to 5):
+                      </p>
+                      
+                      {/* Quick Skill Preset Chips Bar */}
+                      <div className="mb-4 rounded-xl bg-[var(--cx-surface-2)] p-3 border border-[var(--cx-border-1)] space-y-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--cx-text-4)]">
+                          Quick Preset Skill Chips ({selectedLookingFor.length}/5 selected)
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {LOOKING_FOR_CATEGORIES.map((cat) => {
+                            const isSelected = selectedLookingFor.includes(cat.value)
+                            return (
+                              <button
+                                key={cat.value}
+                                type="button"
+                                onClick={() => toggleLookingForRole(cat.value)}
+                                className={cn(
+                                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all border',
+                                  isSelected
+                                    ? 'bg-[var(--cx-brand)] text-white border-[var(--cx-brand)] shadow-xs'
+                                    : 'bg-[var(--cx-surface-1)] text-[var(--cx-text-2)] border-[var(--cx-border-1)] hover:border-[var(--cx-border-2)]'
+                                )}
+                              >
+                                {isSelected ? <Check className="size-3" /> : null}
+                                {cat.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Category Cards */}
                     <div className="grid gap-2 sm:grid-cols-2">
                       {LOOKING_FOR_CATEGORIES.map((cat) => {
                         const isSelected = selectedLookingFor.includes(cat.value)
@@ -512,12 +579,44 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
-                {/* STEP 3: What You Offer */}
+                {/* STEP 3: What You Offer with Preset Skill Chips */}
                 {activeStep === 3 && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-[var(--cx-text-3)] leading-relaxed">
-                      Select what expertise and disciplines you bring to collaborations (up to 5):
-                    </p>
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-xs text-[var(--cx-text-3)] leading-relaxed mb-3">
+                        Select what expertise and disciplines you bring to collaborations (up to 5):
+                      </p>
+
+                      {/* Quick Skill Preset Chips Bar */}
+                      <div className="mb-4 rounded-xl bg-[var(--cx-surface-2)] p-3 border border-[var(--cx-border-1)] space-y-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--cx-text-4)]">
+                          Quick Preset Skill Chips ({selectedOffering.length}/5 selected)
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {OFFERING_CATEGORIES.map((cat) => {
+                            const isSelected = selectedOffering.includes(cat.value)
+                            return (
+                              <button
+                                key={cat.value}
+                                type="button"
+                                onClick={() => toggleOfferingCategory(cat.value)}
+                                className={cn(
+                                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all border',
+                                  isSelected
+                                    ? 'bg-[var(--cx-brand-strong)] text-white border-[var(--cx-brand-strong)] shadow-xs'
+                                    : 'bg-[var(--cx-surface-1)] text-[var(--cx-text-2)] border-[var(--cx-border-1)] hover:border-[var(--cx-border-2)]'
+                                )}
+                              >
+                                {isSelected ? <Check className="size-3" /> : null}
+                                {cat.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Category Cards */}
                     <div className="grid gap-2 sm:grid-cols-2">
                       {OFFERING_CATEGORIES.map((cat) => {
                         const isSelected = selectedOffering.includes(cat.value)
@@ -641,7 +740,7 @@ export default function OnboardingPage() {
                     <div className="rounded-xl bg-[var(--cx-surface-1)] border border-[var(--cx-border-1)] p-4 flex items-center gap-3">
                       <CheckCircle2 className="size-5 text-[var(--cx-success)] shrink-0" />
                       <p className="text-xs text-[var(--cx-text-3)] leading-relaxed">
-                        Ready to launch? Completing onboarding makes your profile discoverable to matches in your network.
+                        Ready to launch? Completing onboarding saves your profile and takes you straight to your Discover feed to start connecting.
                       </p>
                     </div>
                   </div>
@@ -681,7 +780,13 @@ export default function OnboardingPage() {
                     onClick={() => void handleFinish()}
                     className="bg-[var(--cx-brand)] text-white hover:bg-[var(--cx-brand-strong)] px-6"
                   >
-                    {completing ? 'Finishing setup…' : 'Complete Setup & Go Live'}
+                    {completing ? (
+                      'Finishing setup…'
+                    ) : (
+                      <>
+                        Complete Setup &amp; Launch Discover <Compass className="size-4 ml-1.5" />
+                      </>
+                    )}
                   </Button>
                 )}
               </CardFooter>

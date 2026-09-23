@@ -12,6 +12,7 @@ import {
 import { AppError, ErrorCodes } from '@/lib/errors'
 import { EventDetailDialog } from './event-detail-dialog'
 import { guestEventToItem } from './map-to-item'
+import { showSuccessToast } from '@/lib/toast'
 
 export interface EventQuickViewProps {
   eventId: string | null
@@ -97,6 +98,13 @@ export function EventQuickView({ eventId, onOpenChange }: EventQuickViewProps) {
         status: waitlisted ? 'waitlisted' : 'registered',
         waitlistPosition: waitlisted ? result.waitlistPosition : null,
       })
+
+      if (waitlisted) {
+        showSuccessToast("Added to event waitlist!")
+      } else {
+        showSuccessToast("You're registered for this gathering!")
+      }
+
       const updated = await fetchGuestEvent(event.id)
       setEvent(updated)
     } catch (err) {
@@ -151,7 +159,7 @@ export function EventQuickView({ eventId, onOpenChange }: EventQuickViewProps) {
         </div>
       ) : null}
       {actionError ? (
-        <p role="alert" className="text-xs text-[var(--cx-danger)]">
+        <p role="alert" className="text-xs text-[var(--cx-danger)] font-medium">
           {actionError}
         </p>
       ) : null}

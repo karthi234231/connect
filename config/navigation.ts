@@ -3,6 +3,7 @@ import {
   Compass,
   MessageCircle,
   Settings,
+  Sparkles,
   Ticket,
   UserRound,
   UsersRound,
@@ -30,6 +31,8 @@ export const mainNavItems: NavItem[] = [
 export const secondaryNavItems: NavItem[] = [
   { label: 'Profile', href: ROUTES.profile, icon: UserRound },
   { label: 'Settings', href: ROUTES.settings, icon: Settings },
+  { label: 'Onboarding', href: ROUTES.onboarding, icon: Sparkles },
 ]
 
 export const mobileNavItems: NavItem[] = mainNavItems
+

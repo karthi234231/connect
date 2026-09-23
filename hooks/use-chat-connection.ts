@@ -9,7 +9,7 @@ import {
   isTypingEvent,
   type ReactionPayload,
 } from '@/lib/chat/realtime'
-import { getAblyTokenAction } from '@/app/actions/chat'
+import { getAblyTokenAction, publishTypingAction } from '@/app/actions/chat'
 import { MessageDeduplicator } from '@/client/websocket/ably-client'
 
 interface AblyClientRef {
@@ -67,7 +67,10 @@ export function useChatConnection(
   const sendTyping = useCallback(
     (isTyping: boolean) => {
       const cached = clientCache.get(matchId)
-      if (!cached || !optionsRef.current?.myId) return
+      if (!cached || !optionsRef.current?.myId) {
+        void publishTypingAction({ matchId, isTyping }).catch(() => undefined)
+        return
+      }
       const channel = cached.client.channels.get(`match:${matchId}`)
       void channel
         .publish(TYPING_EVENT, {
@@ -79,7 +82,9 @@ export function useChatConnection(
           version: 1,
           payload: { isTyping },
         })
-        .catch(() => undefined)
+        .catch(() => {
+          void publishTypingAction({ matchId, isTyping }).catch(() => undefined)
+        })
     },
     [matchId],
   )

@@ -63,7 +63,7 @@ interface ThreadMessage {
 interface ThreadViewProps {
   matchId: string
   myId: string
-  peer: { fullName: string; role: string | null; avatarUrl: string | null }
+  peer: { id?: string; fullName: string; role: string | null; avatarUrl: string | null }
   /**
    * Render as an inline panel (two-pane chat list) without the full-page
    * main/header chrome. Defaults to the standalone full-page thread view.
@@ -319,6 +319,10 @@ export function ThreadView({
       setProfileUserId(null)
       return
     }
+    if (peer?.id) {
+      setProfileUserId(peer.id)
+      return
+    }
     if (!peer?.fullName) return
     try {
       const matches = await fetchMatches()
@@ -346,6 +350,9 @@ export function ThreadView({
       isPending: true,
     }
     setPending((prev) => [...prev, optimistic])
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    })
     try {
       await sendChatMessage({
         matchId,
@@ -451,6 +458,8 @@ export function ThreadView({
             userId={profileUserId}
             matchId={matchId}
             peerName={peer?.fullName ?? null}
+            peerRole={peer?.role ?? null}
+            peerAvatarUrl={peer?.avatarUrl ?? null}
           />
         ) : null}
       </div>
@@ -465,16 +474,37 @@ export function ThreadView({
             <Sparkles className="size-4" />
           </div>
           <div className="flex items-center gap-3">
-            {peer?.fullName && (
+            {peer?.fullName ? (
               <button
                 type="button"
                 onClick={() => void handleOpenPeerProfile()}
-                title="View profile"
-                className="text-sm font-medium text-[var(--cx-text-1)] underline-offset-2 hover:underline"
+                title={`View ${peer.fullName}'s profile`}
+                className="flex items-center gap-2 rounded-full p-1 transition hover:bg-[var(--cx-surface-2)] focus:outline-none focus:ring-2 focus:ring-[var(--cx-brand)]"
               >
-                {peer.fullName}
+                {peer.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={peer.avatarUrl}
+                    alt={peer.fullName}
+                    className="size-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex size-8 items-center justify-center rounded-full bg-[var(--cx-surface-3)] text-xs font-semibold text-[var(--cx-text-1)]">
+                    {peer.fullName.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="text-left leading-tight hidden sm:block">
+                  <span className="block text-sm font-semibold text-[var(--cx-text-1)] hover:underline">
+                    {peer.fullName}
+                  </span>
+                  {peer.role ? (
+                    <span className="block text-[11px] text-[var(--cx-text-3)]">
+                      {peer.role}
+                    </span>
+                  ) : null}
+                </div>
               </button>
-            )}
+            ) : null}
             <MessageComposer connectionState={connectionState.state} />
           </div>
         </div>
@@ -493,6 +523,8 @@ export function ThreadView({
           userId={profileUserId}
           matchId={matchId}
           peerName={peer?.fullName ?? null}
+          peerRole={peer?.role ?? null}
+          peerAvatarUrl={peer?.avatarUrl ?? null}
         />
       ) : null}
     </main>

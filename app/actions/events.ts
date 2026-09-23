@@ -175,3 +175,9 @@ export async function getGuestRegistrationStatusAction(input: {
     waitlistPosition: data.waitlist_position,
   }
 }
+
+export {
+  createHostedEventAction,
+  createHostedEventAction as createEventAction,
+} from './hosted-events'
+

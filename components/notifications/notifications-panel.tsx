@@ -19,6 +19,7 @@ import { formatRelativeDate } from '@/utils/format-date'
 import {
   fetchNotifications,
   markAllNotificationsRead,
+  markNotificationAsRead,
   type NotificationSummary,
 } from '@/client/api/notifications'
 import { keys } from '@/client/query/keys'
@@ -160,8 +161,21 @@ export function NotificationsPanel({
     }
   }
 
-  function openRecord(record: NotificationRecord) {
-    if (record.href) router.push(record.href)
+  async function openRecord(record: NotificationRecord) {
+    if (!record.read) {
+      try {
+        await markNotificationAsRead(record.id)
+        void refetch()
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('notifications:refresh'))
+        }
+      } catch {
+        // best effort
+      }
+    }
+    if (record.href) {
+      router.push(record.href)
+    }
   }
 
   if (variant === 'dropdown') {
@@ -355,21 +369,18 @@ export function NotificationsPanel({
               !record.read &&
                 'border-[color:var(--cx-brand)/60] bg-[color:var(--cx-brand-soft)/35]',
             )
-            return record.href ? (
-              <a
+            return (
+              <button
+                type="button"
                 key={record.id}
-                href={record.href}
+                onClick={() => void openRecord(record)}
                 className={cn(
                   baseClass,
-                  'text-[var(--cx-text-1)] no-underline transition hover:bg-[var(--cx-surface-2)]',
+                  'w-full text-left text-[var(--cx-text-1)] no-underline transition hover:bg-[var(--cx-surface-2)] cursor-pointer',
                 )}
               >
                 {inner}
-              </a>
-            ) : (
-              <div key={record.id} className={baseClass}>
-                {inner}
-              </div>
+              </button>
             )
           })
         )}

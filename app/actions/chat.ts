@@ -113,6 +113,7 @@ export async function getMessagesAction(input: {
 }
 
 export async function getThreadPeerAction(input: { matchId: string }): Promise<{
+  id: string
   fullName: string
   role: string | null
   avatarUrl: string | null
@@ -133,6 +134,7 @@ export async function getThreadPeerAction(input: { matchId: string }): Promise<{
   }
 
   return {
+    id: peer.otherUser.id,
     fullName: peer.otherUser.fullName,
     role: peer.otherUser.role || null,
     avatarUrl: peer.otherUser.avatarUrl ?? null,

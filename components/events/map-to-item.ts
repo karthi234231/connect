@@ -30,6 +30,7 @@ export function publicEventToItem(event: PublicEventCard): EventItem {
     duration: `${event.durationMinutes} min`,
     attendees: event.attendeeCount,
     capacity: event.capacity,
+    category: event.category ?? undefined,
     tone: DEFAULT_TONE,
     tags: event.tags ?? [],
     startsAt: event.startsAt,
@@ -38,12 +39,23 @@ export function publicEventToItem(event: PublicEventCard): EventItem {
 
 export function guestEventToItem(event: GuestEventDetail): EventItem {
   const { month, date } = monthDayParts(event.startsAt)
+  const hostName = event.organizerName ?? 'Connect Community'
+  const hostInitials = hostName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
   return {
     id: event.id,
     month,
     date,
     title: event.title,
     description: event.description ?? undefined,
+    host: hostName,
+    hostAvatar: event.organizerAvatarUrl ?? undefined,
+    hostInitials,
     location: event.locationOrLink ?? 'Online',
     format: formatFromType(event.type),
     duration: `${event.durationMinutes} min`,
@@ -63,14 +75,18 @@ export function hostedEventToItem(event: EventCardData): EventItem {
     month,
     date,
     title: event.title,
-    host: 'You',
+    host: 'You (Host)',
+    hostInitials: 'ME',
+    isHost: true,
     location: event.location_or_link ?? 'Online',
     format: formatFromType(event.type),
     duration: '',
     attendees: event.attendeeCount ?? 0,
     capacity: event.capacity ?? 0,
+    category: event.category ?? event.format ?? undefined,
     tone: DEFAULT_TONE,
     tags: [],
     startsAt: event.starts_at,
   }
 }
+

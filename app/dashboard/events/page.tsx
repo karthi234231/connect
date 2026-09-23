@@ -106,7 +106,7 @@ export default function EventsPage() {
             <div className="flex items-center gap-3">
               <Badge variant="brand" pulse>
                 <Sparkles className="size-3" />
-                {events.length} {events.length === 1 ? 'event' : 'events'}
+                {events.length} {events.length === 1 ? 'gathering' : 'gatherings'}
               </Badge>
               <Link href={ROUTES.eventsNew}>
                 <Button icon={<Plus className="size-4" />}>New event</Button>

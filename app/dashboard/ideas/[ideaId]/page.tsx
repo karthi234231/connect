@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { useState } from 'react'
-import { ArrowLeft, UsersRound } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ArrowLeft, History, Heart, Sparkles, Users, UsersRound, Wrench } from 'lucide-react'
 import {
   Breadcrumb,
   Button,
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui'
 import { LoadingState } from '@/components/states/LoadingState'
 import { NotFoundState } from '@/components/states/NotFoundState'
-import { useEffect } from 'react'
 import {
   approveJoinRequestAction,
   getIdeaAction,
@@ -28,7 +27,7 @@ import {
   trackIdeaViewedAction,
   validateIdeaAction,
 } from '@/app/actions/ideas'
-import { ReactionBar } from '@/components/ideas'
+import { IdeaFeedbackComments, IdeaRevisionDrawer, ReactionBar } from '@/components/ideas'
 import { queryClient, useQuery } from '@/client/query/client'
 import { initialsForName } from '@/types/profile'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
@@ -99,6 +98,7 @@ export default function IdeaDetailPage() {
   const [joinNoteOpen, setJoinNoteOpen] = useState(false)
   const [togglingJoin, setTogglingJoin] = useState(false)
   const [reacting, setReacting] = useState(false)
+  const [showRevisionDrawer, setShowRevisionDrawer] = useState(false)
 
   // Fire the view signal once per idea id, after the read succeeds, for a
   // non-owner. Best-effort — analytics never blocks or errors the reader.
@@ -106,7 +106,8 @@ export default function IdeaDetailPage() {
     if (idea && !idea.isOwner) {
       void trackIdeaViewedAction(idea.id)
     }
-  }, [idea?.id, idea?.isOwner]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [idea?.id, idea?.isOwner])
+
   async function validate(action: 'like' | 'pass') {
     if (validating) return
     setValidating(true)
@@ -121,9 +122,7 @@ export default function IdeaDetailPage() {
     }
   }
 
-  // Heart toggle: off when liked, on when not. Replace semantics (like the
-  // migration's comment) — one reaction per (idea, user), emoji changes go
-  // through delete + insert.
+  // Heart toggle: off when liked, on when not. Replace semantics — one reaction per (idea, user).
   async function toggleReaction() {
     if (reacting) return
     setReacting(true)
@@ -204,15 +203,30 @@ export default function IdeaDetailPage() {
     (request) => request.status === 'approved',
   )
 
+  const teamNeededSkills = idea?.teamNeeded ?? []
+  const hasCollaboratorIntent = idea?.joinEnabled || teamNeededSkills.length > 0
+
   return (
     <div className="cx-page-enter">
       <div className="mx-auto max-w-[680px] px-4 py-8 sm:px-6 lg:px-8">
-        <Link
-          href="/dashboard/ideas"
-          className="mb-6 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--cx-text-3)] transition hover:text-[var(--cx-text-1)]"
-        >
-          <ArrowLeft className="size-3.5" /> Back to ideas
-        </Link>
+        <div className="mb-6 flex items-center justify-between">
+          <Link
+            href="/dashboard/ideas"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--cx-text-3)] transition hover:text-[var(--cx-text-1)]"
+          >
+            <ArrowLeft className="size-3.5" /> Back to ideas
+          </Link>
+          {idea && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<History className="size-3.5" />}
+              onClick={() => setShowRevisionDrawer(true)}
+            >
+              Revision history
+            </Button>
+          )}
+        </div>
 
         {isLoading ? (
           <LoadingState />
@@ -227,7 +241,7 @@ export default function IdeaDetailPage() {
             }
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Breadcrumb
               items={[
                 {
@@ -237,12 +251,20 @@ export default function IdeaDetailPage() {
                 { label: idea.title },
               ]}
             />
-            <Card>
+            <Card className="border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)]">
               <CardContent className="p-5 sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <h1 className="font-display text-[23px] font-semibold leading-tight tracking-[-.045em] sm:text-[28px]">
-                    {idea.title}
-                  </h1>
+                  <div className="space-y-1.5">
+                    <h1 className="font-display text-[23px] font-semibold leading-tight tracking-[-.045em] sm:text-[28px]">
+                      {idea.title}
+                    </h1>
+                    {hasCollaboratorIntent && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--cx-brand-soft)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--cx-brand-strong)]">
+                        <Users className="size-3" aria-hidden="true" />
+                        {idea.joinEnabled ? 'Open to Collaborators' : 'Seeking Team'}
+                      </span>
+                    )}
+                  </div>
                   <StatusPill
                     label={idea.stage}
                     tone={stageTone(idea.stage)}
@@ -253,26 +275,26 @@ export default function IdeaDetailPage() {
                 <div className="mt-5 space-y-4">
                   <p className="text-sm leading-6 text-[var(--cx-text-2)]">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--cx-text-4)]">
-                      Problem
+                      Target Problem
                     </span>
                     {idea.problem}
                   </p>
                   <p className="text-sm leading-6 text-[var(--cx-text-2)]">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--cx-text-4)]">
-                      Solution
+                      Proposed Solution
                     </span>
                     {idea.solution}
                   </p>
                   <p className="text-sm leading-6 text-[var(--cx-text-2)]">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--cx-text-4)]">
-                      What I need
+                      What I need (Ask)
                     </span>
                     {idea.ask}
                   </p>
                 </div>
 
                 {joinNoteOpen && !idea.isOwner ? (
-                  <div className="mt-4 rounded-xl border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-4">
+                  <div className="mt-4 rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-4">
                     <label className="block">
                       <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--cx-text-4)]">
                         Add a note (optional)
@@ -284,7 +306,7 @@ export default function IdeaDetailPage() {
                         onChange={(e) => setJoinNote(e.target.value)}
                         placeholder="Say how you'd like to help"
                         disabled={joining}
-                        className="w-full resize-none rounded-2xl border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-3 py-2.5 text-sm leading-5 outline-none placeholder:text-[var(--cx-text-4)] focus:border-[var(--cx-brand)]"
+                        className="w-full resize-none rounded-2xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-3 py-2.5 text-sm leading-5 outline-none placeholder:text-[var(--cx-text-4)] focus:border-[var(--cx-brand)]"
                       />
                     </label>
                     <div className="mt-3 flex gap-2">
@@ -302,23 +324,38 @@ export default function IdeaDetailPage() {
                   </div>
                 ) : null}
 
-                {(idea.tags.length > 0 || idea.teamNeeded.length > 0) && (
-                  <div className="mt-5 flex flex-wrap gap-1.5">
+                {/* Team Skill Matching Badges */}
+                {teamNeededSkills.length > 0 && (
+                  <div className="mt-5 rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-3">
+                    <span className="mb-2 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--cx-text-4)]">
+                      <Wrench className="size-3 text-[var(--cx-brand)]" /> Team skills needed:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {teamNeededSkills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="inline-flex items-center rounded-lg border border-[var(--cx-brand)]/30 bg-[var(--cx-brand)]/10 px-2.5 py-1 text-xs font-medium text-[var(--cx-brand-strong)]"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {idea.tags.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
                     {idea.tags.map((tag) => (
                       <Chip key={tag} className="pointer-events-none">
                         {tag}
-                      </Chip>
-                    ))}
-                    {idea.teamNeeded.map((need) => (
-                      <Chip key={need} active className="pointer-events-none">
-                        {need}
                       </Chip>
                     ))}
                   </div>
                 )}
 
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-xs text-[var(--cx-text-3)]">
+                  <span className="text-xs text-[var(--cx-text-3)] flex items-center gap-1">
+                    <Sparkles className="size-3.5 text-[var(--cx-brand)]" />
                     {idea.validationCount} validations
                     {idea.owner.role ? ` · Open to ${idea.owner.role}s` : ''}
                   </span>
@@ -330,32 +367,53 @@ export default function IdeaDetailPage() {
                   </Chip>
                 </div>
 
-                <div className="mt-5 border-t border-[var(--cx-border-1)] pt-4">
+                <div className="mt-5 flex items-center justify-between border-t border-[var(--cx-border-1)] pt-4">
                   <ReactionBar
                     likes={likeCount}
                     replies={0}
                     liked={liked}
                     onLike={() => void toggleReaction()}
                   />
+
+                  {/* Upvote / Endorse toggle button */}
+                  <Button
+                    variant={liked ? 'primary' : 'secondary'}
+                    size="sm"
+                    disabled={reacting}
+                    icon={<Heart className={liked ? 'fill-current' : ''} />}
+                    onClick={() => void toggleReaction()}
+                  >
+                    {liked ? 'Endorsed' : 'Upvote idea'}
+                  </Button>
                 </div>
 
                 {idea.isOwner ? (
-                  <div className="mt-6 flex-wrap items-center gap-2 border-t border-[var(--cx-border-1)] pt-5">
-                    <Link href={`/dashboard/ideas/${idea.id}/edit`}>
-                      <Button variant="ghost">Edit</Button>
-                    </Link>
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--cx-border-1)] pt-5">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/dashboard/ideas/${idea.id}/edit`}>
+                        <Button variant="ghost">Edit concept</Button>
+                      </Link>
+                      <Button
+                        variant="secondary"
+                        disabled={togglingJoin}
+                        onClick={() => void toggleJoin(!idea.joinEnabled)}
+                      >
+                        {idea.joinEnabled
+                          ? 'Close join requests'
+                          : 'Open join requests'}
+                      </Button>
+                    </div>
                     <Button
-                      variant="secondary"
-                      disabled={togglingJoin}
-                      onClick={() => void toggleJoin(!idea.joinEnabled)}
+                      variant="ghost"
+                      size="sm"
+                      icon={<History className="size-3.5" />}
+                      onClick={() => setShowRevisionDrawer(true)}
                     >
-                      {idea.joinEnabled
-                        ? 'Close join requests'
-                        : 'Open join requests'}
+                      History
                     </Button>
                   </div>
                 ) : (
-                  <div className="mt-6 flex-wrap items-center gap-2 border-t border-[var(--cx-border-1)] pt-5">
+                  <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-[var(--cx-border-1)] pt-5">
                     <Button
                       variant="ghost"
                       disabled={validating}
@@ -391,6 +449,9 @@ export default function IdeaDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Feedback Comments Section */}
+            <IdeaFeedbackComments ideaId={idea.id} />
 
             {idea.isOwner && (
               <>
@@ -498,9 +559,18 @@ export default function IdeaDetailPage() {
                 </Card>
               </>
             )}
+
+            {/* Slide-over Revision History Drawer */}
+            <IdeaRevisionDrawer
+              ideaId={idea.id}
+              ideaTitle={idea.title}
+              open={showRevisionDrawer}
+              onOpenChange={setShowRevisionDrawer}
+            />
           </div>
         )}
       </div>
     </div>
   )
 }
+

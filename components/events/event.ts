@@ -5,6 +5,8 @@ export type EventItem = {
   title: string
   description?: string
   host?: string
+  hostAvatar?: string
+  hostInitials?: string
   location: string
   format: 'Online' | 'In person'
   duration: string
@@ -14,4 +16,8 @@ export type EventItem = {
   tone?: string
   tags: string[]
   startsAt?: string
+  isHost?: boolean
+  registered?: boolean
+  waitlisted?: boolean
 }
+

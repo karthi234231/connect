@@ -2,6 +2,7 @@ import {
   getUnreadNotificationCount,
   listActionableNotifications,
   markAllNotificationsRead as markAllReadAction,
+  markNotificationAsReadAction,
   type ActionableNotificationItem,
 } from '@/app/actions/notifications'
 
@@ -15,6 +16,10 @@ export async function fetchNotifications(): Promise<
 
 export async function fetchUnreadCount(): Promise<number> {
   return getUnreadNotificationCount()
+}
+
+export async function markNotificationAsRead(id: string): Promise<void> {
+  await markNotificationAsReadAction(id)
 }
 
 export async function markAllNotificationsRead(): Promise<void> {

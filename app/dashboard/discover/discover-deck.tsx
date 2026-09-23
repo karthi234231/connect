@@ -11,6 +11,7 @@ import { fetchDiscoverBatchAction } from '@/app/actions/discover'
 import { performSwipe } from '@/client/api/matches'
 import { ErrorState } from '@/components/states/ErrorState'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { MatchModal } from '@/components/matching/match-modal'
 import {
   MemberProfileDialog,
   SwipeDeck,
@@ -23,6 +24,7 @@ import type {
   DiscoverBatch,
   DiscoverCandidateDTO,
 } from '@/services/discover/candidates.service'
+import { getIntentLabel } from '@/services/profiles/intent'
 import { initialsForName } from '@/types/profile'
 
 export type DeckBatch =
@@ -53,16 +55,32 @@ function toPerson(candidate: DiscoverCandidateDTO): Person {
     .sort((a, b) => b.value - a.value)
     .slice(0, 3)
 
+  const offeringLabels = (profile.offering?.categories ?? [])
+    .map((cat) => getIntentLabel(cat) ?? cat)
+    .filter((v, i, a) => a.indexOf(v) === i)
+
+  const lookingForLabels = (profile.lookingFor?.roles ?? [])
+    .map((role) => getIntentLabel(role) ?? role)
+    .filter((v, i, a) => a.indexOf(v) === i)
+
+  const intentBadges: { label: string; type: 'offering' | 'lookingFor' }[] = [
+    ...offeringLabels.map((l) => ({ label: l, type: 'offering' as const })),
+    ...lookingForLabels.map((l) => ({ label: l, type: 'lookingFor' as const })),
+  ]
+
   return {
     id: profile.id,
     name: profile.fullName,
-    role: profile.role,
+    role: getIntentLabel(profile.role) ?? profile.role,
     company: '',
     initials: initialsForName(profile.fullName || '··'),
     tone: toneForName(profile.fullName),
     note: profile.bio ?? '',
-    tags: profile.skills,
-    location: profile.city ?? '',
+    tags: profile.skills, // skills offered
+    offering: offeringLabels.length > 0 ? offeringLabels : profile.skills,
+    lookingFor: lookingForLabels,
+    intentBadges,
+    location: profile.city ?? profile.timezone ?? '',
     availability:
       availability.length > 0 ? `Available ${availability.join(' · ')}` : '',
     mutuals: 0,
@@ -86,7 +104,14 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [matchedName, setMatchedName] = useState<string | null>(null)
+  const [matchedState, setMatchedState] = useState<{
+    matchedName: string
+    matchedRole?: string
+    matchedAvatarUrl?: string | null
+    matchedInitials?: string
+    matchedTone?: string
+    matchId?: string | null
+  } | null>(null)
   const [profileTarget, setProfileTarget] = useState<{
     userId: string
     name: string
@@ -132,7 +157,14 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
       )
       setItems((current) => current.filter((item) => item.profile.id !== id))
       if (result.matchCreated) {
-        setMatchedName(candidate.profile.fullName)
+        setMatchedState({
+          matchedName: candidate.profile.fullName,
+          matchedRole: getIntentLabel(candidate.profile.role) ?? candidate.profile.role,
+          matchedAvatarUrl: candidate.profile.avatarUrl,
+          matchedInitials: initialsForName(candidate.profile.fullName || '··'),
+          matchedTone: toneForName(candidate.profile.fullName),
+          matchId: result.matchId ?? null,
+        })
         showSuccessToast(`You matched with ${candidate.profile.fullName}!`)
         announce(`You matched with ${candidate.profile.fullName}`)
       } else {
@@ -166,7 +198,7 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
         }
       />
 
-      {matchedName ? (
+      {matchedState ? (
         <div className="mb-6 cx-scale-up rounded-[24px] border border-[color-mix(in_srgb,var(--cx-brand)_40%,transparent)] bg-[var(--cx-surface-2)]/90 backdrop-blur-md p-5 shadow-[var(--cx-shadow-glow)]">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-full bg-[var(--cx-brand-soft)] text-[var(--cx-brand-strong)]">
@@ -174,7 +206,7 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
             </div>
             <div>
               <p className="text-sm font-semibold text-[var(--cx-text-1)]">
-                It&apos;s a match with {matchedName} 🎉
+                It&apos;s a match with {matchedState.matchedName} 🎉
               </p>
               <p className="mt-0.5 text-xs text-[var(--cx-text-3)]">
                 Head to Messages to start the conversation.
@@ -285,6 +317,19 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
           }}
           userId={profileTarget.userId}
           peerName={profileTarget.name}
+        />
+      ) : null}
+
+      {matchedState ? (
+        <MatchModal
+          open
+          onClose={() => setMatchedState(null)}
+          matchedName={matchedState.matchedName}
+          matchedRole={matchedState.matchedRole}
+          matchedAvatarUrl={matchedState.matchedAvatarUrl}
+          matchedInitials={matchedState.matchedInitials}
+          matchedTone={matchedState.matchedTone}
+          matchId={matchedState.matchId}
         />
       ) : null}
     </div>

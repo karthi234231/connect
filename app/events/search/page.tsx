@@ -6,32 +6,19 @@ import { queryClient, useQuery } from '@/client/query/client'
 import { keys } from '@/client/query/keys'
 import { searchEvents } from '@/client/api/search'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { EventQuickView } from '@/components/events'
+import { EventCard, EventQuickView, publicEventToItem } from '@/components/events'
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardTitle,
   Chip,
   EmptyState,
   Input,
 } from '@/components/ui'
-import { AvatarGroup, type AvatarGroupItem } from '@/components/ui/avatar-group'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { generateEventIcs } from '@/lib/calendar'
 import { downloadTextFile } from '@/client/api/events'
 import { showSuccessToast } from '@/lib/toast'
-
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return 'Date to be announced'
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
 
 const CATEGORY_PILLS = [
   'All',
@@ -50,7 +37,6 @@ export default function EventSearchPage() {
   const [submitted, setSubmitted] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-  const trimmed = query.trim()
 
   const { data, isLoading, error, refetch } = useQuery(
     keys.search(submitted).join('/'),
@@ -108,7 +94,7 @@ export default function EventSearchPage() {
     <div className="cx-page-enter max-w-[1180px] mx-auto px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         eyebrow="Community events"
-        title="Search events"
+        title="Search gatherings"
         description="Find meetups, workshops, and founder circles near you."
       />
 
@@ -119,7 +105,7 @@ export default function EventSearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Try “founders”, “workshop”, or “build night”…"
-            aria-label="Search events"
+            aria-label="Search gatherings"
             className="pl-9 pr-8"
           />
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--cx-text-4)]" />
@@ -164,12 +150,12 @@ export default function EventSearchPage() {
       {!submitted ? (
         <EmptyState
           icon={<Search className="size-9 text-[var(--cx-brand)]" />}
-          title="Search community events"
+          title="Search community gatherings"
           description="Click a category pill above or type a keyword to find events happening across Connect."
         />
       ) : error && !data ? (
         <ErrorState
-          title="Couldn't search events"
+          title="Couldn't search gatherings"
           description="We hit a snag searching. Please try again."
           onRetry={() => void refetch()}
         />
@@ -178,7 +164,7 @@ export default function EventSearchPage() {
       ) : results.length === 0 ? (
         <EmptyState
           icon={<Search className="size-9" />}
-          title={`No events found for “${submitted}”`}
+          title={`No gatherings found for “${submitted}”`}
           description="Try selecting a different category pill, or check back soon."
           action={
             <Button variant="secondary" onClick={handleClear}>
@@ -187,69 +173,47 @@ export default function EventSearchPage() {
           }
         />
       ) : (
-        <div className="space-y-4">
-          {results.map((event, idx) => {
-            const sampleAvatars: AvatarGroupItem[] = [
-              { alt: 'Alex Morgan', initials: 'AM' },
-              { alt: 'Devon Zhao', initials: 'DZ' },
-              { alt: 'Chris Vance', initials: 'CV' },
-            ].slice(0, (idx % 3) + 2)
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {results.map((event) => {
+            const item = publicEventToItem({
+              id: event.id,
+              title: event.title,
+              startsAt: event.starts_at ?? new Date().toISOString(),
+              locationOrLink: event.location_or_link,
+              type: 'virtual',
+              format: event.format ?? 'Social',
+              durationMinutes: 60,
+              attendeeCount: 0,
+              capacity: 50,
+              tags: [event.format || 'Gathering'],
+            })
+
 
             return (
-              <Card key={event.id} className="p-5 transition hover:border-[var(--cx-brand)]/40">
-                <CardContent className="flex flex-wrap items-start justify-between gap-4 p-0">
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div>
-                      <CardTitle className="text-lg leading-snug">{event.title}</CardTitle>
-                      <p className="mt-1 text-xs text-[var(--cx-text-3)]">
-                        {formatDate(event.starts_at)} ·{' '}
-                        {event.location_or_link || 'Online'} · {event.format || 'Community'}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="brand">{event.format || 'Gathering'}</Badge>
-                      <Badge variant="outline">{event.timezone || 'UTC'}</Badge>
-                    </div>
-
-                    {/* Attendee Avatars Preview */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <AvatarGroup items={sampleAvatars} size="sm" max={3} />
-                      <span className="text-[11px] text-[var(--cx-text-3)]">
-                        Attending with network members
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-center shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Download className="size-3.5" />}
-                      onClick={() => handleExportIcs(event)}
-                      title="Export .ics calendar invite"
-                      aria-label={`Export calendar invite for ${event.title}`}
-                    >
-                      .ics
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSelectedEventId(event.id)}
-                    >
-                      Details <ChevronRight className="size-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <EventCard
+                key={event.id}
+                event={item}
+                onOpen={() => setSelectedEventId(event.id)}
+                onExportIcs={() => handleExportIcs(event)}
+                footerAction={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedEventId(event.id)}
+                  >
+                    Details <ChevronRight className="size-3.5" />
+                  </Button>
+                }
+              />
             )
           })}
-
-          <EventQuickView
-            eventId={selectedEventId}
-            onOpenChange={handleQuickViewChange}
-          />
         </div>
       )}
+
+      <EventQuickView
+        eventId={selectedEventId}
+        onOpenChange={handleQuickViewChange}
+      />
     </div>
   )
 }
