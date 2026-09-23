@@ -5,17 +5,18 @@
 // SwipeDeck (components/people) presents people[0]; this module feeds it the
 // ranked DiscoverCandidateDTO projection and owns every server interaction.
 import { useCallback, useMemo, useState } from 'react'
+import { RefreshCw, Sparkles, UserCheck } from 'lucide-react'
 
 import { fetchDiscoverBatchAction } from '@/app/actions/discover'
 import { performSwipe } from '@/client/api/matches'
 import { ErrorState } from '@/components/states/ErrorState'
-import { LoadingState } from '@/components/states/LoadingState'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   MemberProfileDialog,
   SwipeDeck,
   type Person,
 } from '@/components/people'
+import { Badge, Button, EmptyState, Skeleton } from '@/components/ui'
 import { useLiveRegion } from '@/hooks/use-live-region'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import type {
@@ -155,29 +156,98 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
         eyebrow="Discover"
         title="Meet your people"
         description="Swipe through aligned profiles — every card is server-ranked."
+        actions={
+          remaining > 0 ? (
+            <Badge variant="brand" pulse className="cx-fade-in">
+              <Sparkles className="size-3" />
+              {remaining} aligned deck profiles
+            </Badge>
+          ) : null
+        }
       />
+
       {matchedName ? (
-        <div className="mb-4 rounded-[20px] border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] p-5">
-          <p className="text-sm font-medium">
-            It&apos;s a match with {matchedName} 🎉
-          </p>
-          <p className="mt-1 text-xs text-[var(--cx-text-3)]">
-            Head to Messages to say hello.
-          </p>
+        <div className="mb-6 cx-scale-up rounded-[24px] border border-[color-mix(in_srgb,var(--cx-brand)_40%,transparent)] bg-[var(--cx-surface-2)]/90 backdrop-blur-md p-5 shadow-[var(--cx-shadow-glow)]">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-full bg-[var(--cx-brand-soft)] text-[var(--cx-brand-strong)]">
+              <UserCheck className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[var(--cx-text-1)]">
+                It&apos;s a match with {matchedName} 🎉
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--cx-text-3)]">
+                Head to Messages to start the conversation.
+              </p>
+            </div>
+          </div>
         </div>
       ) : null}
+
       {top == null ? (
         loadingMore ? (
-          <LoadingState label="Loading more profiles…" />
+          <div className="space-y-4">
+            <div className="cx-glass-card rounded-[28px] p-6 h-[440px] flex flex-col justify-between relative overflow-hidden">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-12 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-5 w-36" />
+                  <Skeleton className="h-3.5 w-24" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <div className="flex gap-2 pt-4">
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
         ) : loadError ? (
           <ErrorState onRetry={() => void refill()} />
         ) : exhausted || initialBatch.version === 'invalid' ? (
-          <div className="rounded-[20px] border border-dashed border-[var(--cx-border-2)] p-8 text-center text-sm text-[var(--cx-text-3)]">
-            No more profiles right now — check back soon for fresh
-            recommendations.
+          <div className="cx-glass-card rounded-[28px] p-8 text-center">
+            <EmptyState
+              icon={<Sparkles className="size-8" />}
+              title="All caught up!"
+              description="No more profiles right now — check back soon for fresh AI-ranked recommendations."
+              action={
+                cursor != null ? (
+                  <Button
+                    variant="secondary"
+                    icon={<RefreshCw className="size-4" />}
+                    onClick={() => void refill()}
+                  >
+                    Refresh deck
+                  </Button>
+                ) : null
+              }
+            />
           </div>
         ) : (
-          <LoadingState label="Loading profiles…" />
+          <div className="space-y-4">
+            <div className="cx-glass-card rounded-[28px] p-6 h-[440px] flex flex-col justify-between relative overflow-hidden">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-12 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-5 w-36" />
+                  <Skeleton className="h-3.5 w-24" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <div className="flex gap-2 pt-4">
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
         )
       ) : (
         <div className="space-y-4">
@@ -189,17 +259,18 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
               setProfileTarget({ userId: person.id, name: person.name })
             }
           />
-          <div className="flex items-center justify-between text-xs text-[var(--cx-text-4)]">
-            <span>{remaining} in deck</span>
+          <div className="flex items-center justify-between text-xs text-[var(--cx-text-3)] pt-2 px-1">
+            <span className="font-medium">{remaining} profiles remaining</span>
             {cursor != null ? (
-              <button
-                type="button"
-                disabled={loadingMore}
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={loadingMore}
+                icon={<RefreshCw className="size-3.5" />}
                 onClick={() => void refill()}
-                className="font-medium text-[var(--cx-brand-strong)] disabled:opacity-60"
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
-              </button>
+              </Button>
             ) : null}
           </div>
           {loadError ? <ErrorState onRetry={() => void refill()} /> : null}

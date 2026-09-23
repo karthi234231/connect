@@ -36,11 +36,24 @@ export function NotificationBell() {
     const start = window.setTimeout(() => void refresh(), 0)
     const interval = window.setInterval(() => void refresh(), POLL_INTERVAL_MS)
     const onFocus = () => void refresh()
+    const handleRefresh = () => void refresh()
+    const handleCount = (event: Event) => {
+      const customEvent = event as CustomEvent<{ count: number }>
+      if (typeof customEvent.detail?.count === 'number') {
+        setCount(customEvent.detail.count)
+      }
+    }
+
     window.addEventListener('focus', onFocus)
+    window.addEventListener('notifications:refresh', handleRefresh)
+    window.addEventListener('notifications:count', handleCount)
+
     return () => {
       window.clearTimeout(start)
       window.clearInterval(interval)
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener('notifications:refresh', handleRefresh)
+      window.removeEventListener('notifications:count', handleCount)
     }
   }, [refresh])
 

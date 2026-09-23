@@ -135,12 +135,21 @@ export default function AdminPage() {
   )
 
   // 2. Live system health probes
+  const [healthRefreshing, setHealthRefreshing] = useState(false)
   const {
     data: health,
     isLoading: healthLoading,
-    isFetching: healthRefreshing,
     refetch: refetchHealth,
   } = useQuery(ADMIN_QUERY_KEYS.health, () => fetchSystemHealth())
+
+  async function handleRefreshHealth() {
+    setHealthRefreshing(true)
+    try {
+      await refetchHealth()
+    } finally {
+      setHealthRefreshing(false)
+    }
+  }
 
   // 3. Users list for suspension management
   const {
@@ -407,7 +416,7 @@ export default function AdminPage() {
             variant="ghost"
             size="sm"
             disabled={healthRefreshing}
-            onClick={() => void refetchHealth()}
+            onClick={() => void handleRefreshHealth()}
             icon={<RefreshCw className={`size-3.5 ${healthRefreshing ? 'animate-spin' : ''}`} />}
           >
             Refresh Probes

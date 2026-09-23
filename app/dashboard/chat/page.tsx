@@ -27,6 +27,7 @@ export default function ChatPage() {
     getOwnProfileAction(),
   )
   const threads = data ?? []
+  const totalUnread = threads.reduce((acc, t) => acc + (t.unread || 0), 0)
 
   const selectedMatch =
     selectedMatchId != null
@@ -39,6 +40,15 @@ export default function ChatPage() {
         <PageHeader
           title="Chat"
           description="Conversations worth making space for."
+          actions={
+            totalUnread > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--cx-brand)] bg-[var(--cx-brand-soft)] px-3 py-1 text-xs font-semibold text-[var(--cx-brand-strong)]">
+                <span>
+                  {totalUnread} unread message{totalUnread > 1 ? 's' : ''}
+                </span>
+              </span>
+            ) : null
+          }
         />
 
         {isLoading ? (

@@ -19,6 +19,7 @@ import {
   MessageComposer,
   type ComposerSendDraft,
 } from '@/components/chat/MessageComposer'
+import { MessageList, type ChatMessage } from '@/components/chat/message-list'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { formatRelativeDate } from '@/utils/format-date'
@@ -196,7 +197,7 @@ export function ThreadView({
   peer,
   embedded = false,
 }: ThreadViewProps) {
-  const connectionState = useChatConnection(matchId)
+  const connectionState = useChatConnection(matchId, { myId })
   const { polite: announce } = useLiveRegion()
   const [threadKey] = useState(() => keys.messages(matchId).join('/'))
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
@@ -207,6 +208,7 @@ export function ThreadView({
   const [sendError, setSendError] = useState<string | null>(null)
   const [pending, setPending] = useState<ThreadMessage[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     void markConversationRead(matchId).catch(() => undefined)
@@ -227,7 +229,7 @@ export function ThreadView({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [visible.length])
+  }, [visible.length, connectionState.isPeerTyping])
 
   useEffect(() => {
     if (error) return
@@ -236,6 +238,20 @@ export function ThreadView({
     }, 10000)
     return () => clearInterval(timer)
   }, [error, refetch])
+
+  const handleDraftChange = (text: string) => {
+    if (!connectionState.sendTyping) return
+    if (text.length > 0) {
+      connectionState.sendTyping(true)
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = setTimeout(() => {
+        connectionState.sendTyping?.(false)
+      }, 2500)
+    } else {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+      connectionState.sendTyping(false)
+    }
+  }
 
   async function handleOpenPeerProfile() {
     if (profileUserId) {
@@ -256,6 +272,8 @@ export function ThreadView({
 
   async function handleSend(draft: ComposerSendDraft) {
     if (sending) return
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    connectionState.sendTyping?.(false)
     const content = attachmentCaption(draft)
     setSending(true)
     setSendError(null)
@@ -285,6 +303,18 @@ export function ThreadView({
     }
   }
 
+  const chatMessages: ChatMessage[] = visible.map((m) => ({
+    id: m.id,
+    text: m.content,
+    sent: m.sender_id === myId,
+    time: formatRelativeDate(m.created_at),
+    status: 'sent',
+    attachmentUrl: m.attachmentUrl,
+    attachmentName: m.attachmentUrl
+      ? m.attachmentUrl.split('/').pop() ?? 'Attachment'
+      : null,
+  }))
+
   const body = isLoading ? (
     <LoadingState label="Loading conversation…" />
   ) : error ? (
@@ -292,38 +322,18 @@ export function ThreadView({
   ) : (
     <>
       <div aria-live="polite" className="flex flex-1 flex-col gap-2">
-        {visible.length === 0 ? (
+        {chatMessages.length === 0 && !connectionState.isPeerTyping ? (
           <p className="py-10 text-center text-sm text-[var(--cx-text-3)]">
             No messages yet. Say hello to start the conversation.
           </p>
         ) : (
-          visible.map((m) => {
-            const mine = m.sender_id === myId
-            return (
-              <div key={m.id} className="flex flex-col">
-                <div
-                  className={cn(
-                    'max-w-[75%] rounded-2xl px-3 py-2 text-sm',
-                    mine
-                      ? 'self-end bg-[var(--cx-brand)] text-white'
-                      : 'self-start bg-[var(--cx-surface-2)] text-[var(--cx-text-1)]',
-                  )}
-                >
-                  {m.content}
-                </div>
-                <span
-                  className={cn(
-                    'mt-0.5 text-[10px] text-[var(--cx-text-4)]',
-                    mine ? 'self-end' : 'self-start',
-                  )}
-                >
-                  {formatRelativeDate(m.created_at)}
-                </span>
-              </div>
-            )
-          })
+          <MessageList
+            messages={[chatMessages]}
+            isPeerTyping={connectionState.isPeerTyping}
+            peerName={peer?.fullName}
+            endRef={bottomRef}
+          />
         )}
-        <div ref={bottomRef} />
       </div>
 
       {sendError ? (
@@ -339,6 +349,7 @@ export function ThreadView({
         matchId={matchId}
         onSend={handleSend}
         onError={setSendError}
+        onDraftChange={handleDraftChange}
       />
 
       <RelationshipSuggestionsCard

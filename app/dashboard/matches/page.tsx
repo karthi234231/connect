@@ -1,22 +1,23 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { Ban, Flag, HeartHandshake } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Ban, Flag, HeartHandshake, MessageSquare, Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { MemberProfileDialog } from '@/components/people'
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
+  Badge,
   Button,
   Card,
   Chip,
   EmptyState,
+  Skeleton,
   StatusPill,
 } from '@/components/ui'
 import { ErrorState } from '@/components/states/ErrorState'
-import { LoadingState } from '@/components/states/LoadingState'
 import { keys } from '@/client/query/keys'
 import { useQuery } from '@/client/query/client'
 import {
@@ -29,9 +30,12 @@ import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import { initialsForName } from '@/types/profile'
 import { useLiveRegion } from '@/hooks/use-live-region'
 
+type MatchFilter = 'all' | 'active' | 'pending'
+
 export default function MatchesPage() {
   const { polite: announce } = useLiveRegion()
   const [quotaKey] = useState(() => ['matches', 'swipe-quota'].join('/'))
+  const [matchFilter, setMatchFilter] = useState<MatchFilter>('all')
   const [busyMatchId, setBusyMatchId] = useState<string | null>(null)
   const [profileTarget, setProfileTarget] = useState<{
     userId: string
@@ -44,6 +48,12 @@ export default function MatchesPage() {
   )
   const { data: quotaData } = useQuery(quotaKey, () => fetchSwipeQuota())
   const matches = (data ?? []).filter((m) => m.status !== 'declined')
+
+  const filteredMatches = useMemo(() => {
+    if (matchFilter === 'active') return matches.filter((m) => m.status === 'active')
+    if (matchFilter === 'pending') return matches.filter((m) => m.status === 'pending')
+    return matches
+  }, [matches, matchFilter])
 
   async function handleDismiss(matchId: string) {
     if (busyMatchId != null) return
@@ -86,120 +96,197 @@ export default function MatchesPage() {
     <div className="cx-page-enter">
       <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
+          eyebrow="Connections"
           title="Matches"
           description="Aligned on what matters to you."
           actions={
             quotaData != null ? (
-              <Chip active tabIndex={-1} className="pointer-events-none">
-                Today&apos;s swipes: {quotaData.remaining} left
-              </Chip>
+              <Badge variant="brand" pulse>
+                <Sparkles className="size-3" />
+                {quotaData.remaining} swipes left today
+              </Badge>
             ) : null
           }
         />
 
+        {/* Status Filter Pills */}
+        <div
+          data-horizontal-scroll
+          className="mb-6 flex items-center gap-2 overflow-x-auto pb-1"
+        >
+          <Chip
+            active={matchFilter === 'all'}
+            onClick={() => setMatchFilter('all')}
+            className="cursor-pointer transition-all duration-200 hover:scale-105"
+          >
+            All matches ({matches.length})
+          </Chip>
+          <Chip
+            active={matchFilter === 'active'}
+            onClick={() => setMatchFilter('active')}
+            className="cursor-pointer transition-all duration-200 hover:scale-105"
+          >
+            Active
+          </Chip>
+          <Chip
+            active={matchFilter === 'pending'}
+            onClick={() => setMatchFilter('pending')}
+            className="cursor-pointer transition-all duration-200 hover:scale-105"
+          >
+            Pending
+          </Chip>
+        </div>
+
         {isLoading ? (
-          <LoadingState label="Loading matches…" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="cx-glass-card rounded-[20px] p-5 space-y-4"
+              >
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-11 rounded-full shrink-0" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3.5 w-20" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                </div>
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <ErrorState onRetry={() => void refetch()} />
-        ) : matches.length === 0 ? (
-          <EmptyState
-            icon={<HeartHandshake className="size-8" />}
-            title="No matches yet"
-            description="Keep browsing and aligned people will surface here."
-          />
+        ) : filteredMatches.length === 0 ? (
+          <div className="cx-glass-card rounded-[28px] p-8 text-center">
+            <EmptyState
+              icon={<HeartHandshake className="size-8 text-[var(--cx-brand)]" />}
+              title={matchFilter === 'all' ? 'No matches yet' : 'No matching connections'}
+              description={
+                matchFilter === 'all'
+                  ? 'Keep browsing discover cards and aligned people will surface here.'
+                  : 'Try selecting a different filter pill to view all connections.'
+              }
+              action={
+                <Link href="/dashboard/discover">
+                  <Button icon={<Sparkles className="size-4" />}>
+                    Discover profiles
+                  </Button>
+                </Link>
+              }
+            />
+          </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {matches.map((m) => (
-              <Card key={m.matchId} className="flex flex-col p-5">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setProfileTarget({
-                        userId: m.otherUser.id,
-                        matchId: m.matchId,
-                        name: m.otherUser.fullName,
-                      })
-                    }
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                  >
-                    <Avatar className="size-11 shrink-0 bg-[var(--cx-surface-3)]">
-                      {m.otherUser.avatarUrl ? (
-                        <AvatarImage
-                          src={m.otherUser.avatarUrl}
-                          alt={m.otherUser.fullName}
-                        />
-                      ) : null}
-                      <AvatarFallback>
-                        {initialsForName(m.otherUser.fullName || '··')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-display text-lg font-medium tracking-[-.02em] hover:underline">
-                        {m.otherUser.fullName}
-                      </p>
-                      {m.otherUser.role ? (
-                        <p className="truncate text-xs text-[var(--cx-text-3)]">
-                          {m.otherUser.role}
-                        </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredMatches.map((m, index) => (
+              <div
+                key={m.matchId}
+                className="cx-fade-in"
+                style={{ animationDelay: `${index * 60}ms` }}
+              >
+                <Card glass className="flex flex-col p-5 h-full justify-between">
+                  <div>
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProfileTarget({
+                            userId: m.otherUser.id,
+                            matchId: m.matchId,
+                            name: m.otherUser.fullName,
+                          })
+                        }
+                        className="flex min-w-0 flex-1 items-start gap-3 text-left group"
+                      >
+                        <Avatar className="size-11 shrink-0 bg-[var(--cx-surface-3)] ring-2 ring-[var(--cx-border-1)] group-hover:ring-[var(--cx-brand)] transition-all duration-200">
+                          {m.otherUser.avatarUrl ? (
+                            <AvatarImage
+                              src={m.otherUser.avatarUrl}
+                              alt={m.otherUser.fullName}
+                            />
+                          ) : null}
+                          <AvatarFallback>
+                            {initialsForName(m.otherUser.fullName || '··')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-display text-lg font-medium tracking-[-.02em] text-[var(--cx-text-1)] group-hover:text-[var(--cx-brand-strong)] transition-colors duration-200">
+                            {m.otherUser.fullName}
+                          </p>
+                          {m.otherUser.role ? (
+                            <p className="truncate text-xs text-[var(--cx-text-3)]">
+                              {m.otherUser.role}
+                            </p>
+                          ) : null}
+                        </div>
+                      </button>
+                      {m.unreadCount > 0 ? (
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--cx-brand)] text-[11px] font-semibold text-white cx-pulse-glow">
+                          {m.unreadCount > 9 ? '9+' : m.unreadCount}
+                        </span>
                       ) : null}
                     </div>
-                  </button>
-                  {m.unreadCount > 0 ? (
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--cx-brand)] text-[11px] font-semibold text-white">
-                      {m.unreadCount > 9 ? '9+' : m.unreadCount}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {m.status ? (
-                    <StatusPill
-                      label={m.status === 'active' ? 'Active' : 'Pending'}
-                      tone={m.status === 'active' ? 'success' : 'info'}
-                      className="shrink-0"
-                    />
-                  ) : null}
-                  {m.matchReason ? (
-                    <Chip active tabIndex={-1} className="pointer-events-none">
-                      {m.matchReason}
-                    </Chip>
-                  ) : null}
-                </div>
-                <p className="mt-2 line-clamp-2 text-sm leading-5 text-[var(--cx-text-3)]">
-                  {m.lastMessage?.content ??
-                    'Say hello to start the conversation.'}
-                </p>
-                <div className="mt-4">
-                  <Link
-                    href={`/dashboard/chat/${m.matchId}`}
-                    className="flex h-10 w-full items-center justify-center rounded-full bg-[var(--cx-brand)] text-sm font-medium text-white transition hover:bg-[var(--cx-brand-strong)]"
-                  >
-                    Message
-                  </Link>
-                </div>
-                <div className="mt-3 flex items-center justify-end gap-2">
-                  {m.status === 'pending' ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Ban className="size-3.5" />}
-                      disabled={busyMatchId === m.matchId}
-                      onClick={() => void handleDismiss(m.matchId)}
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {m.status ? (
+                        <StatusPill
+                          label={m.status === 'active' ? 'Active' : 'Pending'}
+                          tone={m.status === 'active' ? 'success' : 'info'}
+                          className="shrink-0"
+                        />
+                      ) : null}
+                      {m.matchReason ? (
+                        <Chip active tabIndex={-1} className="pointer-events-none">
+                          {m.matchReason}
+                        </Chip>
+                      ) : null}
+                    </div>
+
+                    <p className="mt-3 line-clamp-2 text-sm leading-5 text-[var(--cx-text-3)]">
+                      {m.lastMessage?.content ??
+                        'Say hello to start the conversation.'}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 space-y-2">
+                    <Link
+                      href={`/dashboard/chat/${m.matchId}`}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[var(--cx-brand)] text-sm font-medium text-white transition-all duration-200 hover:bg-[var(--cx-brand-strong)] hover:shadow-[0_4px_16px_rgba(208,164,91,0.25)] active:scale-[0.98]"
                     >
-                      Dismiss
-                    </Button>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={<Flag className="size-3.5" />}
-                    disabled={busyMatchId === m.matchId}
-                    onClick={() => void handleReport(m.matchId, m.otherUser.id)}
-                  >
-                    Report
-                  </Button>
-                </div>
-              </Card>
+                      <MessageSquare className="size-4" />
+                      Message
+                    </Link>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      {m.status === 'pending' ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={<Ban className="size-3.5" />}
+                          disabled={busyMatchId === m.matchId}
+                          onClick={() => void handleDismiss(m.matchId)}
+                        >
+                          Dismiss
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Flag className="size-3.5" />}
+                        disabled={busyMatchId === m.matchId}
+                        onClick={() => void handleReport(m.matchId, m.otherUser.id)}
+                      >
+                        Report
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              </div>
             ))}
           </div>
         )}

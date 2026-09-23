@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { Paperclip, Plus } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import {
   MESSAGE_REACTIONS,
@@ -21,6 +21,20 @@ const STATUS_LABEL: Record<'sent' | 'read' | 'pending', string> = {
   pending: 'Sending',
 }
 
+function isImageAttachment(url?: string | null): boolean {
+  if (!url) return false
+  if (url.startsWith('data:image/')) return true
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase()
+  return (
+    cleanUrl.endsWith('.jpg') ||
+    cleanUrl.endsWith('.jpeg') ||
+    cleanUrl.endsWith('.png') ||
+    cleanUrl.endsWith('.webp') ||
+    cleanUrl.endsWith('.gif') ||
+    cleanUrl.endsWith('.svg')
+  )
+}
+
 export interface MessageBubbleProps {
   text: string
   time?: string
@@ -30,6 +44,8 @@ export interface MessageBubbleProps {
   tone?: string
   displayName?: string
   showSender?: boolean
+  attachmentUrl?: string | null
+  attachmentName?: string | null
   /**
    * Aggregated reaction chips rendered under the bubble. Omit to hide the
    * whole reaction affordance for this message.
@@ -48,10 +64,45 @@ export function MessageBubble({
   tone,
   displayName,
   showSender = false,
+  attachmentUrl,
+  attachmentName,
   reactions,
   onToggleReaction,
 }: MessageBubbleProps): ReactNode {
   const [pickerOpen, setPickerOpen] = useState(false)
+
+  const renderAttachment = () => {
+    if (!attachmentUrl) return null
+    const isImg = isImageAttachment(attachmentUrl)
+    return (
+      <div className="mt-2 overflow-hidden rounded-xl">
+        {isImg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={attachmentUrl}
+            alt={attachmentName ?? 'Media attachment'}
+            className="max-h-60 max-w-full rounded-xl object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <a
+            href={attachmentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition',
+              sent
+                ? 'border-white/30 bg-white/10 text-white hover:bg-white/20'
+                : 'border-[var(--cx-border-1)] bg-[var(--cx-surface-3)] text-[var(--cx-text-1)] hover:bg-[var(--cx-surface-1)]',
+            )}
+          >
+            <Paperclip className="size-3.5 shrink-0" />
+            <span className="truncate">{attachmentName ?? 'View attachment'}</span>
+          </a>
+        )}
+      </div>
+    )
+  }
 
   const reactionControls =
     reactions === undefined ? null : (
@@ -120,6 +171,7 @@ export function MessageBubble({
       <div className="ml-auto flex w-fit max-w-[82%] flex-col items-end gap-0.5">
         <div className="rounded-2xl rounded-tr-md bg-[var(--cx-brand)] px-3.5 py-2.5 text-sm text-white">
           <p className="break-words whitespace-pre-wrap">{text}</p>
+          {renderAttachment()}
           {time || status ? (
             <div className="mt-1 flex items-center justify-end gap-1 text-[9px] text-white/65">
               {time ? <span>{time}</span> : null}
@@ -146,6 +198,7 @@ export function MessageBubble({
       ) : null}
       <div className="w-fit rounded-2xl rounded-tl-md border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-3.5 py-2.5 text-sm text-[var(--cx-text-2)]">
         <p className="break-words whitespace-pre-wrap">{text}</p>
+        {renderAttachment()}
         {time ? (
           <div className="mt-1 text-[9px] text-[var(--cx-text-4)]">{time}</div>
         ) : null}

@@ -1,12 +1,13 @@
 'use client'
 
-import type { ReactNode, Ref } from 'react'
+import { useEffect, useRef, type ReactNode, type Ref } from 'react'
 import { cn } from '@/utils/cn'
 import type {
   MessageReaction,
   ReactionSummary,
 } from '@/lib/chat/reactions'
 import { MessageBubble } from './message-bubble'
+import { TypingIndicator } from './typing-indicator'
 
 export type ChatMessage = {
   id: string
@@ -17,6 +18,8 @@ export type ChatMessage = {
   senderInitials?: string
   senderTone?: string
   senderName?: string
+  attachmentUrl?: string | null
+  attachmentName?: string | null
   reactions?: ReactionSummary[]
 }
 
@@ -31,6 +34,9 @@ export interface MessageListProps {
   /** Rendered just before the end sentinel (typography tail, etc.). */
   footer?: ReactNode
   onToggleReaction?: (messageId: string, emoji: MessageReaction) => void
+  isPeerTyping?: boolean
+  peerTone?: string
+  peerName?: string
   className?: string
 }
 
@@ -41,8 +47,20 @@ export function MessageList({
   endRef,
   footer,
   onToggleReaction,
+  isPeerTyping = false,
+  peerTone,
+  peerName,
   className,
 }: MessageListProps): ReactNode {
+  const internalEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = (endRef && typeof endRef === 'object' && 'current' in endRef && endRef.current)
+      ? endRef.current
+      : internalEndRef.current
+    el?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, isPeerTyping, endRef])
+
   return (
     <div
       role="log"
@@ -85,6 +103,8 @@ export function MessageList({
                     tone={message.senderTone}
                     displayName={message.senderName}
                     showSender={Boolean(message.senderInitials && lastIncoming)}
+                    attachmentUrl={message.attachmentUrl}
+                    attachmentName={message.attachmentName}
                     reactions={message.reactions}
                     onToggleReaction={
                       onToggleReaction
@@ -97,8 +117,15 @@ export function MessageList({
             </div>
           )
         })}
+        {isPeerTyping ? (
+          <TypingIndicator
+            tone={peerTone}
+            label={peerName ? `${peerName} is typing…` : 'Typing…'}
+            className="mt-2"
+          />
+        ) : null}
         {footer ? <div className="flex">{footer}</div> : null}
-        <div ref={endRef} />
+        <div ref={endRef ?? internalEndRef} />
       </div>
     </div>
   )

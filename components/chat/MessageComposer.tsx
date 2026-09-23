@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type ReactNode } from 'react'
-import { Paperclip, Send } from 'lucide-react'
+import { Paperclip, Send, X } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import {
   ALLOWED_ATTACHMENT_MIME,
@@ -110,9 +110,6 @@ export function MessageComposer({
 
     setAttaching(true)
     try {
-      // createAttachmentUpload mints the canonical match-scoped path and a
-      // signed upload URL; the bytes only land after the server asserts the
-      // caller owns the thread.
       const upload = await createChatAttachmentUpload(matchId, file)
       await uploadChatAttachment(file, upload.signedUrl)
       setAttachment({ url: upload.path, name: file.name })
@@ -143,64 +140,87 @@ export function MessageComposer({
     Boolean(attachment),
   )
 
+  const isImageAttachment = (name: string) =>
+    /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(name)
+
   return (
-    <form onSubmit={handleSubmit} className="mt-4 flex items-center gap-2">
-      <label htmlFor="chat-composer-input" className="sr-only">
-        Type a message
-      </label>
-      <input
-        id="chat-composer-input"
-        value={draft}
-        onChange={(event) => {
-          setDraft(event.target.value)
-          onDraftChange?.(event.target.value)
-        }}
-        placeholder={placeholder ?? 'Type a message\u2026'}
-        maxLength={COMPOSER_MAX_CHARS}
-        disabled={disabled}
-        autoComplete="off"
-        autoFocus={autoFocus}
-        className={cn(
-          'h-11 flex-1 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-4 text-sm text-[var(--cx-text-1)] outline-none placeholder:text-[var(--cx-text-4)] focus:border-[var(--cx-brand)] disabled:opacity-60',
-          className,
-        )}
-      />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={ALLOWED_ATTACHMENT_MIME.join(',')}
-        onChange={handleFile}
-        className="sr-only"
-        aria-label="Attach a file"
-      />
+    <div className="mt-4 flex flex-col gap-2">
       {attachment ? (
-        <span
-          title={attachment.name}
-          className="hidden max-w-[140px] truncate text-xs text-[var(--cx-brand-strong)] sm:inline"
-        >
-          {attachment.name}
-        </span>
+        <div className="flex items-center gap-2 rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-3 py-2 text-xs">
+          {isImageAttachment(attachment.name) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={attachment.url}
+              alt="Attachment preview"
+              className="size-8 rounded-md object-cover"
+            />
+          ) : (
+            <Paperclip className="size-4 shrink-0 text-[var(--cx-brand-strong)]" />
+          )}
+          <span className="max-w-[200px] truncate font-medium text-[var(--cx-text-1)] sm:max-w-[300px]">
+            {attachment.name}
+          </span>
+          <button
+            type="button"
+            onClick={() => setAttachment(null)}
+            aria-label="Remove attachment"
+            className="ml-auto rounded-full p-1 text-[var(--cx-text-4)] hover:bg-[var(--cx-surface-3)] hover:text-[var(--cx-text-1)]"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
       ) : null}
-      {matchId ? (
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || sending || attaching}
+
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
+        <label htmlFor="chat-composer-input" className="sr-only">
+          Type a message
+        </label>
+        <input
+          id="chat-composer-input"
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value)
+            onDraftChange?.(event.target.value)
+          }}
+          placeholder={placeholder ?? 'Type a message\u2026'}
+          maxLength={COMPOSER_MAX_CHARS}
+          disabled={disabled}
+          autoComplete="off"
+          autoFocus={autoFocus}
+          className={cn(
+            'h-11 flex-1 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-4 text-sm text-[var(--cx-text-1)] outline-none placeholder:text-[var(--cx-text-4)] focus:border-[var(--cx-brand)] disabled:opacity-60',
+            className,
+          )}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ALLOWED_ATTACHMENT_MIME.join(',')}
+          onChange={handleFile}
+          className="sr-only"
           aria-label="Attach a file"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] text-[var(--cx-text-2)] transition hover:border-[var(--cx-border-2)] hover:text-[var(--cx-text-1)] disabled:opacity-50"
+        />
+        {matchId ? (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || sending || attaching}
+            aria-label="Attach a file"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] text-[var(--cx-text-2)] transition hover:border-[var(--cx-border-2)] hover:text-[var(--cx-text-1)] disabled:opacity-50"
+          >
+            <Paperclip className="size-4" />
+          </button>
+        ) : null}
+        <button
+          type="submit"
+          disabled={disabled || sending || !submitReady}
+          aria-label="Send message"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--cx-brand)] text-white transition hover:bg-[var(--cx-brand-strong)] disabled:opacity-50"
         >
-          <Paperclip className="size-4" />
+          <Send className="size-4" />
         </button>
-      ) : null}
-      <button
-        type="submit"
-        disabled={disabled || sending || !submitReady}
-        aria-label="Send message"
-        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--cx-brand)] text-white transition hover:bg-[var(--cx-brand-strong)] disabled:opacity-50"
-      >
-        <Send className="size-4" />
-      </button>
-    </form>
+      </form>
+    </div>
   )
 }
 

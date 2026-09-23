@@ -155,6 +155,9 @@ export function NotificationsPanel({
   async function markAllRead() {
     await markAllNotificationsRead()
     await refetch()
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('notifications:refresh'))
+    }
   }
 
   function openRecord(record: NotificationRecord) {

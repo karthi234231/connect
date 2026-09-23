@@ -10,11 +10,9 @@ import {
   type ReactionPayload,
 } from '@/lib/chat/realtime'
 import { getAblyTokenAction } from '@/app/actions/chat'
+import { MessageDeduplicator } from '@/client/websocket/ably-client'
 
 interface AblyClientRef {
-  // The concrete Ably Realtime instance — its `connection.on/off` overloads
-  // (event names + callbacks) must be preserved, so a hand-rolled structural
-  // type would be narrower than reality and fail to accept it.
   client: Realtime
   matchId: string
 }
@@ -35,6 +33,8 @@ export interface ChatRealtimeState {
   state: ComposerConnectionState
   /** True while the peer's typing presence is active (S032). */
   isPeerTyping: boolean
+  /** Publish local user typing signal to the peer. */
+  sendTyping?: (isTyping: boolean) => void
 }
 
 interface ChannelMessage {
@@ -48,6 +48,7 @@ export function useChatConnection(
   const [state, setState] = useState<ComposerConnectionState>('connecting')
   const [isPeerTyping, setIsPeerTyping] = useState(false)
   const optionsRef = useRef(options)
+  const deduplicatorRef = useRef(new MessageDeduplicator())
 
   useEffect(() => {
     optionsRef.current = options
@@ -62,6 +63,26 @@ export function useChatConnection(
       cleanupRef.current = null
     }
   }, [])
+
+  const sendTyping = useCallback(
+    (isTyping: boolean) => {
+      const cached = clientCache.get(matchId)
+      if (!cached || !optionsRef.current?.myId) return
+      const channel = cached.client.channels.get(`match:${matchId}`)
+      void channel
+        .publish(TYPING_EVENT, {
+          eventId: `typing-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          type: 'typing',
+          actorId: optionsRef.current.myId,
+          conversationId: matchId,
+          createdAt: new Date().toISOString(),
+          version: 1,
+          payload: { isTyping },
+        })
+        .catch(() => undefined)
+    },
+    [matchId],
+  )
 
   useEffect(() => {
     if (initializing.current) return
@@ -93,6 +114,7 @@ export function useChatConnection(
         const handleTyping = (message: ChannelMessage) => {
           const envelope = message.data
           if (!isTypingEvent(envelope)) return
+          if (!deduplicatorRef.current.track(envelope.eventId)) return
           const myId = optionsRef.current?.myId
           if (myId && envelope.actorId === myId) return
           setIsPeerTyping(envelope.payload.isTyping)
@@ -100,6 +122,7 @@ export function useChatConnection(
         const handleReaction = (message: ChannelMessage) => {
           const envelope = message.data
           if (!isReactionEvent(envelope)) return
+          if (!deduplicatorRef.current.track(envelope.eventId)) return
           optionsRef.current?.onReaction?.(envelope.payload)
         }
 
@@ -178,5 +201,5 @@ export function useChatConnection(
     }
   }, [matchId, cleanup])
 
-  return { state, isPeerTyping }
+  return { state, isPeerTyping, sendTyping }
 }
