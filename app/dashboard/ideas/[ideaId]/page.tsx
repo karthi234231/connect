@@ -3,7 +3,17 @@
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, History, Heart, Sparkles, Users, UsersRound, Wrench } from 'lucide-react'
+import {
+  ArrowLeft,
+  Bookmark,
+  History,
+  Heart,
+  Share2,
+  Sparkles,
+  Users,
+  UsersRound,
+  Wrench,
+} from 'lucide-react'
 import {
   Breadcrumb,
   Button,
@@ -27,10 +37,18 @@ import {
   trackIdeaViewedAction,
   validateIdeaAction,
 } from '@/app/actions/ideas'
-import { IdeaFeedbackComments, IdeaRevisionDrawer, ReactionBar } from '@/components/ideas'
+import {
+  IdeaFeedbackComments,
+  IdeaRevisionDrawer,
+  JoinTeamModal,
+  ReactionBar,
+  ShareIdeaModal,
+  useIdeaBookmark,
+} from '@/components/ideas'
 import { queryClient, useQuery } from '@/client/query/client'
 import { initialsForName } from '@/types/profile'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
+import { cn } from '@/utils/cn'
 import type { IdeaDetailDTO } from '@/services/ideas/idea.schema'
 import type { IdeaReactionSummary } from '@/services/ideas/reactions'
 
@@ -90,12 +108,14 @@ export default function IdeaDetailPage() {
   )
   const liked = reactions.some((reaction) => reaction.mine)
 
+  const { isBookmarked, toggleBookmark } = useIdeaBookmark(ideaId)
+
   const [reviewingId, setReviewingId] = useState<string | null>(null)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [validating, setValidating] = useState(false)
   const [joining, setJoining] = useState(false)
-  const [joinNote, setJoinNote] = useState('')
-  const [joinNoteOpen, setJoinNoteOpen] = useState(false)
+  const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
   const [togglingJoin, setTogglingJoin] = useState(false)
   const [reacting, setReacting] = useState(false)
   const [showRevisionDrawer, setShowRevisionDrawer] = useState(false)
@@ -141,25 +161,24 @@ export default function IdeaDetailPage() {
     }
   }
 
-  async function join() {
+  async function handleJoinSubmit(pitchMessage: string) {
     if (joining) return
     setJoining(true)
     try {
       await requestJoinAction({
         ideaId,
-        message: joinNote.trim() === '' ? undefined : joinNote.trim(),
+        message: pitchMessage || undefined,
       })
-      setJoinNoteOpen(false)
-      setJoinNote('')
       queryClient.invalidate(ideasKey)
       await refetch()
-      showSuccessToast('Join request sent')
+      showSuccessToast('Join request sent to idea owner')
     } catch (err) {
       showErrorToast(
         err instanceof Error
           ? err.message
           : 'That join request could not be sent.',
       )
+      throw err
     } finally {
       setJoining(false)
     }
@@ -209,7 +228,7 @@ export default function IdeaDetailPage() {
   return (
     <div className="cx-page-enter">
       <div className="mx-auto max-w-[680px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/dashboard/ideas"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--cx-text-3)] transition hover:text-[var(--cx-text-1)]"
@@ -217,14 +236,39 @@ export default function IdeaDetailPage() {
             <ArrowLeft className="size-3.5" /> Back to ideas
           </Link>
           {idea && (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<History className="size-3.5" />}
-              onClick={() => setShowRevisionDrawer(true)}
-            >
-              Revision history
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={
+                  <Bookmark
+                    className={cn(
+                      'size-3.5',
+                      isBookmarked && 'fill-current text-[var(--cx-brand)]',
+                    )}
+                  />
+                }
+                onClick={toggleBookmark}
+              >
+                {isBookmarked ? 'Saved' : 'Save'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Share2 className="size-3.5" />}
+                onClick={() => setShareModalOpen(true)}
+              >
+                Share
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<History className="size-3.5" />}
+                onClick={() => setShowRevisionDrawer(true)}
+              >
+                History
+              </Button>
+            </div>
           )}
         </div>
 
@@ -293,37 +337,6 @@ export default function IdeaDetailPage() {
                   </p>
                 </div>
 
-                {joinNoteOpen && !idea.isOwner ? (
-                  <div className="mt-4 rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-4">
-                    <label className="block">
-                      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--cx-text-4)]">
-                        Add a note (optional)
-                      </span>
-                      <textarea
-                        rows={3}
-                        maxLength={500}
-                        value={joinNote}
-                        onChange={(e) => setJoinNote(e.target.value)}
-                        placeholder="Say how you'd like to help"
-                        disabled={joining}
-                        className="w-full resize-none rounded-2xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-3 py-2.5 text-sm leading-5 outline-none placeholder:text-[var(--cx-text-4)] focus:border-[var(--cx-brand)]"
-                      />
-                    </label>
-                    <div className="mt-3 flex gap-2">
-                      <Button disabled={joining} onClick={() => void join()}>
-                        {joining ? 'Sending…' : 'Send request'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        disabled={joining}
-                        onClick={() => setJoinNoteOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-
                 {/* Team Skill Matching Badges */}
                 {teamNeededSkills.length > 0 && (
                   <div className="mt-5 rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-3">
@@ -375,16 +388,25 @@ export default function IdeaDetailPage() {
                     onLike={() => void toggleReaction()}
                   />
 
-                  {/* Upvote / Endorse toggle button */}
-                  <Button
-                    variant={liked ? 'primary' : 'secondary'}
-                    size="sm"
-                    disabled={reacting}
-                    icon={<Heart className={liked ? 'fill-current' : ''} />}
-                    onClick={() => void toggleReaction()}
-                  >
-                    {liked ? 'Endorsed' : 'Upvote idea'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Share2 className="size-3.5" />}
+                      onClick={() => setShareModalOpen(true)}
+                    >
+                      Share
+                    </Button>
+                    <Button
+                      variant={liked ? 'primary' : 'secondary'}
+                      size="sm"
+                      disabled={reacting}
+                      icon={<Heart className={liked ? 'fill-current' : ''} />}
+                      onClick={() => void toggleReaction()}
+                    >
+                      {liked ? 'Endorsed' : 'Upvote idea'}
+                    </Button>
+                  </div>
                 </div>
 
                 {idea.isOwner ? (
@@ -440,9 +462,10 @@ export default function IdeaDetailPage() {
                     ) : idea.canJoin ? (
                       <Button
                         disabled={joining}
-                        onClick={() => setJoinNoteOpen((open) => !open)}
+                        icon={<Users className="size-3.5" />}
+                        onClick={() => setJoinModalOpen(true)}
                       >
-                        {joining ? 'Sending…' : 'Ask to join'}
+                        {joining ? 'Sending…' : 'Request to Join Team'}
                       </Button>
                     ) : null}
                   </div>
@@ -477,7 +500,7 @@ export default function IdeaDetailPage() {
 
                     {pending.length === 0 ? (
                       <p className="mt-3 text-xs leading-5 text-[var(--cx-text-3)]">
-                        No pending requests — you're all caught up.
+                        No pending requests — you&apos;re all caught up.
                       </p>
                     ) : (
                       <div className="mt-4 space-y-3">
@@ -560,6 +583,27 @@ export default function IdeaDetailPage() {
               </>
             )}
 
+            {/* Request to Join Team Modal */}
+            <JoinTeamModal
+              open={joinModalOpen}
+              onOpenChange={setJoinModalOpen}
+              ideaTitle={idea.title}
+              teamNeededSkills={idea.teamNeeded}
+              isSubmitting={joining}
+              onSubmit={handleJoinSubmit}
+            />
+
+            {/* Share Idea Modal */}
+            <ShareIdeaModal
+              open={shareModalOpen}
+              onOpenChange={setShareModalOpen}
+              idea={{
+                id: idea.id,
+                title: idea.title,
+                problem: idea.problem,
+              }}
+            />
+
             {/* Slide-over Revision History Drawer */}
             <IdeaRevisionDrawer
               ideaId={idea.id}
@@ -573,4 +617,3 @@ export default function IdeaDetailPage() {
     </div>
   )
 }
-

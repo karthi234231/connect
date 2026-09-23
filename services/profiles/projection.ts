@@ -17,6 +17,7 @@
 // city/LinkedIn and mutual-context services will fill. `experience` stays empty
 // by default and is filled by attachExperience()/experience-read (Session 11).
 
+import type { SocialLinks } from '@/types/profile'
 import type { OnboardingStatus } from './onboarding'
 import { PROFILE_FIELD_OWNER, type FieldOwner } from './field-ownership'
 import {
@@ -39,7 +40,7 @@ import {
 // lacks them, and mapRowToProjection treats that as null/empty (see the
 // defensive branch in the mapper).
 export const PROFILE_PROJECTION_COLUMNS =
-  'id, full_name, role, bio, skills, availability, timezone, looking_for, offering, visibility, avatar_url, commitment_level, work_style, last_active_at, created_at, updated_at, onboarding_status, onboarding_completed_at, provider_headline, provider_location, headline, idea'
+  'id, full_name, role, bio, skills, availability, timezone, looking_for, offering, visibility, avatar_url, commitment_level, work_style, last_active_at, created_at, updated_at, onboarding_status, onboarding_completed_at, provider_headline, provider_location, headline, idea, social_links'
 
 // ─── Row shape (superset of the table row for defensive mapping) ───────────
 // Legitimate defensive reads may carry extra keys (e.g. a future private
@@ -77,6 +78,7 @@ export interface ProfileRowLike {
   // Session 03 — user-owned introduction columns (migration added both).
   headline?: string | null
   idea?: string | null
+  social_links?: unknown
 }
 
 // ─── Provider-vs-user origin ────────────────────────────────────────────────
@@ -223,6 +225,7 @@ export interface ProfileProjection {
   /** User-owned "What I'm Building" idea (profiles.idea). */
   idea: string | null
   bio: string | null
+  socialLinks?: SocialLinks | null
   lookingFor: {
     roles: LookingForIntent[]
   }
@@ -371,6 +374,7 @@ const OWNERSHIP_FIELDS: ReadonlyArray<{
   { projectionKey: 'headline', dbField: 'headline' },
   { projectionKey: 'idea', dbField: 'idea' },
   { projectionKey: 'bio', dbField: 'bio' },
+  { projectionKey: 'socialLinks', dbField: 'social_links' },
   { projectionKey: 'lookingFor', dbField: 'looking_for' },
   { projectionKey: 'offering', dbField: 'offering' },
   { projectionKey: 'experience', dbField: null },
@@ -412,6 +416,18 @@ function parseNotificationPrefs(
   return prefs
 }
 
+export function parseSocialLinks(value: unknown): SocialLinks {
+  if (!isRecord(value)) {
+    return { github: null, linkedin: null, twitter: null, portfolio: null }
+  }
+  return {
+    github: asNullableString(value.github),
+    linkedin: asNullableString(value.linkedin),
+    twitter: asNullableString(value.twitter),
+    portfolio: asNullableString(value.portfolio),
+  }
+}
+
 /**
  * Map a DB row to the canonical projection. Pure + deterministic: identical
  * rows produce identical projections (no timestamps, no randomness).
@@ -435,6 +451,7 @@ export function mapRowToProjection(row: ProfileRowLike): ProfileProjection {
     headline: row.headline ?? null,
     idea: row.idea ?? null,
     bio: row.bio ?? null,
+    socialLinks: parseSocialLinks(row.social_links),
     lookingFor: { roles: lookingFor.categories },
     offering: { categories: offering.categories },
     experience: [],

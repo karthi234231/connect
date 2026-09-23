@@ -105,6 +105,17 @@ export type ProviderIdentityInput = z.infer<typeof providerIdentitySchema>
 // here. offering/commitmentLevel/workStyle stay optional — missing intent is
 // not a negative judgment (see intent.ts) and the settings are genuinely
 // optional. timezone is IANA-validated internally (real Intl round-trip).
+export const socialLinksSchema = z
+  .object({
+    github: z.string().trim().max(250).optional().nullable(),
+    linkedin: z.string().trim().max(250).optional().nullable(),
+    twitter: z.string().trim().max(250).optional().nullable(),
+    portfolio: z.string().trim().max(250).optional().nullable(),
+  })
+  .partial()
+
+export type SocialLinksInput = z.infer<typeof socialLinksSchema>
+
 export const connectContextSchema = z
   .object({
     bio: bioSchema,
@@ -116,6 +127,7 @@ export const connectContextSchema = z
     commitmentLevel: commitmentLevelSchema.optional(),
     workStyle: workStyleSchema.optional(),
     timezone: timezoneSchema,
+    socialLinks: socialLinksSchema.optional(),
   })
   .strict()
 
@@ -154,6 +166,7 @@ export const profileSchema = z
     commitmentLevel: connectContextSchema.shape.commitmentLevel,
     workStyle: connectContextSchema.shape.workStyle,
     offering: connectContextSchema.shape.offering,
+    socialLinks: socialLinksSchema.optional(),
   })
   .strict()
 
@@ -184,6 +197,7 @@ const profileUserEditableFields = z.object({
   commitmentLevel: connectContextSchema.shape.commitmentLevel,
   workStyle: connectContextSchema.shape.workStyle,
   offering: connectContextSchema.shape.offering,
+  socialLinks: socialLinksSchema.optional(),
 })
 
 export const profileUpdateSchema = profileUserEditableFields.partial()

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Briefcase, Calendar, MapPin, Sparkles, User } from 'lucide-react'
 import { getPublicProfile } from '@/services/profiles/public-profile'
 import { Badge, Button, Card, CardContent, CardTitle } from '@/components/ui'
+import { SocialLinksBar, VCardExportButton } from '@/components/profile'
 
 interface ProfilePageProps {
   params: Promise<{ userId: string }>
@@ -56,7 +57,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
         <Card className="overflow-hidden border border-[#293038] bg-[#101317]/90 backdrop-blur-xl shadow-2xl">
           <div className="h-32 bg-[linear-gradient(120deg,var(--cx-brand-soft),var(--cx-surface-2))]" />
           <CardContent className="relative px-6 pb-8 pt-0 sm:px-8">
-            <div className="-mt-14 mb-4 flex items-end justify-between gap-4">
+            <div className="-mt-14 mb-4 flex items-end justify-between gap-4 flex-wrap">
               <div className="size-24 overflow-hidden rounded-2xl border-4 border-[#101317] bg-[#1C2127] shadow-xl">
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -72,11 +73,25 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                 )}
               </div>
 
-              <Link href={`/login?next=/profile/${profileId}`}>
-                <Button variant="primary" icon={<Sparkles className="size-4" />}>
-                  Connect with {firstName}
-                </Button>
-              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <VCardExportButton
+                  profile={{
+                    fullName,
+                    role: profile.currentRole,
+                    bio: profile.bio,
+                    city: profile.city,
+                    timezone: profile.timezone,
+                    socialLinks: profile.socialLinks,
+                  }}
+                  variant="secondary"
+                  size="sm"
+                />
+                <Link href={`/login?next=/profile/${profileId}`}>
+                  <Button variant="primary" icon={<Sparkles className="size-4" />}>
+                    Connect with {firstName}
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -96,6 +111,16 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                 <p className="text-sm leading-relaxed text-[#8D8A84]">
                   {profile.bio}
                 </p>
+              ) : null}
+
+              {profile.socialLinks ? (
+                <div className="pt-2 pb-1">
+                  <SocialLinksBar
+                    socialLinks={profile.socialLinks}
+                    size="sm"
+                    showLabels
+                  />
+                </div>
               ) : null}
 
               <div className="flex flex-wrap items-center gap-4 text-xs text-[#8D8A84] pt-2">

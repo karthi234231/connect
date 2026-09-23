@@ -253,6 +253,7 @@ const createEventSchema = z
     type: z.enum(['virtual', 'irl']).optional(),
     capacity: z.number().int().min(1).max(100000).optional(),
     category: z.string().trim().max(40).optional(),
+    coverImage: z.string().trim().max(1000).nullable().optional(),
   })
   .strict()
 
@@ -281,6 +282,7 @@ export async function createHostedEventAction(input: {
   type?: 'virtual' | 'irl'
   capacity?: number
   category?: string
+  coverImage?: string | null
 }): Promise<EventWriteResult> {
   const parsed = createEventSchema.safeParse(input)
   if (!parsed.success) {
@@ -307,6 +309,7 @@ export async function createHostedEventAction(input: {
         type: parsed.data.type ?? 'virtual',
         capacity: parsed.data.capacity ?? 50,
         category: parsed.data.category ?? 'general',
+        cover_image: parsed.data.coverImage ?? null,
         status: 'published',
         visibility: 'public',
         published_at: new Date().toISOString(),
@@ -330,6 +333,7 @@ const updateEventSchema = z
     startsAt: z.string().datetime().optional(),
     locationOrLink: z.string().trim().max(300).nullable().optional(),
     capacity: z.number().int().min(1).max(100000).optional(),
+    coverImage: z.string().trim().max(1000).nullable().optional(),
   })
   .strict()
 
@@ -345,6 +349,7 @@ export async function updateHostedEventAction(input: {
   startsAt?: string
   locationOrLink?: string | null
   capacity?: number
+  coverImage?: string | null
 }): Promise<EventWriteResult> {
   const idParsed = eventIdSchema.safeParse({ eventId: input.eventId })
   const parsed = updateEventSchema.safeParse({
@@ -353,6 +358,7 @@ export async function updateHostedEventAction(input: {
     startsAt: input.startsAt,
     locationOrLink: input.locationOrLink,
     capacity: input.capacity,
+    coverImage: input.coverImage,
   })
 
   if (!idParsed.success || !parsed.success) {
@@ -376,6 +382,7 @@ export async function updateHostedEventAction(input: {
     // the same 'Online' default the create path uses.
     patch.location_or_link = parsed.data.locationOrLink ?? 'Online'
   if (parsed.data.capacity !== undefined) patch.capacity = parsed.data.capacity
+  if (parsed.data.coverImage !== undefined) patch.cover_image = parsed.data.coverImage
 
   try {
     const userId = await requireUser()

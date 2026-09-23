@@ -6,3 +6,7 @@ export * from './profile-header'
 export * from './profile-section'
 export * from './settings-group'
 export * from './settings-row'
+export * from './social-links-bar'
+export * from './social-links-editor'
+export * from './vcard-button'
+

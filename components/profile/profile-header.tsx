@@ -1,5 +1,7 @@
 import { Pencil, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage, Button } from '@/components/ui'
+import type { SocialLinks } from '@/types/profile'
+import { SocialLinksBar } from './social-links-bar'
 import { cn } from '@/utils/cn'
 
 export interface ProfileHeaderProps {
@@ -14,6 +16,8 @@ export interface ProfileHeaderProps {
   availabilityTone?: 'success' | 'info'
   skills?: string[]
   stats?: { label: string; value: string }[]
+  socialLinks?: SocialLinks | null
+  actions?: React.ReactNode
   onEdit?: () => void
   editing?: boolean
 }
@@ -30,6 +34,8 @@ export function ProfileHeader({
   availabilityTone = 'success',
   skills = [],
   stats = [],
+  socialLinks,
+  actions,
   onEdit,
   editing = false,
 }: ProfileHeaderProps) {
@@ -70,8 +76,8 @@ export function ProfileHeader({
           </div>
         )}
 
-        <div className="mt-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <h2 className="truncate font-display text-[24px] font-semibold tracking-[-.04em] text-[var(--cx-text-1)]">
               {name}
             </h2>
@@ -82,21 +88,24 @@ export function ProfileHeader({
               </p>
             ) : null}
           </div>
-          {onEdit ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label={editing ? 'Stop editing' : 'Edit profile'}
-              onClick={onEdit}
-            >
-              {editing ? (
-                <X className="size-4" />
-              ) : (
-                <Pencil className="size-4" />
-              )}
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {actions}
+            {onEdit ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                aria-label={editing ? 'Stop editing' : 'Edit profile'}
+                onClick={onEdit}
+              >
+                {editing ? (
+                  <X className="size-4" />
+                ) : (
+                  <Pencil className="size-4" />
+                )}
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {availability ? (
@@ -125,6 +134,12 @@ export function ProfileHeader({
           <p className="mt-3 text-sm leading-5 text-[var(--cx-text-2)]">
             {bio}
           </p>
+        ) : null}
+
+        {socialLinks ? (
+          <div className="mt-4 pt-3 border-t border-[var(--cx-border-1)]">
+            <SocialLinksBar socialLinks={socialLinks} size="sm" showLabels />
+          </div>
         ) : null}
 
         {skills.length > 0 ? (

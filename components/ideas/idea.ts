@@ -14,5 +14,5 @@ export type Idea = {
   upvotesCount?: number
   isUpvoted?: boolean
   commentCount?: number
+  isBookmarked?: boolean
 }
-

@@ -1,6 +1,7 @@
 'use client'
 
-import { CalendarDays, Check, Download, Globe, MapPin, Plus, Sparkles, User, Users } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarDays, Check, Download, Globe, MapPin, Plus, Share2, Sparkles, User, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/utils/cn'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { EventActions } from './event-actions'
 import type { EventItem } from './event'
+import { ShareEventDialog } from './share-event-dialog'
 import { showSuccessToast } from '@/lib/toast'
 
 export interface EventDetailDialogProps {
@@ -59,6 +61,8 @@ export function EventDetailDialog({
   onRegister,
   children,
 }: EventDetailDialogProps) {
+  const [shareOpen, setShareOpen] = useState(false)
+
   const defaultAvatars: AvatarGroupItem[] = Array.from(
     { length: Math.min(event.attendees || 3, 5) },
     (_, i) => {
@@ -91,75 +95,114 @@ export function EventDetailDialog({
     }
   }
 
+  const isImageUrl = (val?: string) =>
+    val &&
+    (val.startsWith('http://') ||
+      val.startsWith('https://') ||
+      val.startsWith('/') ||
+      val.startsWith('data:'))
+
+  const coverUrl = isImageUrl(event.coverImage)
+    ? event.coverImage
+    : isImageUrl(event.tone)
+      ? event.tone
+      : null
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg overflow-hidden p-0 rounded-2xl">
-        <div
-          className={cn(
-            'relative h-36 w-full bg-gradient-to-br p-4 flex flex-col justify-between',
-            event.tone ??
-              'from-[var(--cx-brand-soft)] to-[var(--cx-surface-2)]',
-          )}
-        >
-          <span className="pointer-events-none absolute -left-8 -top-10 size-32 rounded-full bg-white/15 blur-2xl" />
-          <span className="pointer-events-none absolute -bottom-12 right-6 size-36 rounded-full bg-black/10 blur-2xl" />
-
-          <div className="flex items-center justify-between z-10">
-            <span className="rounded-md bg-white/90 px-2.5 py-1 text-xs font-bold text-[#322b3a] shadow-sm">
-              {event.month} {event.date}
-            </span>
-            <DialogClose className="bg-white/90 text-[#322b3a] hover:bg-white rounded-full p-1" />
-          </div>
-
-          <div className="flex items-center gap-2 z-10">
-            {event.category && (
-              <Badge variant="brand">{event.category.toUpperCase()}</Badge>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg overflow-hidden p-0 rounded-2xl">
+          <div
+            className={cn(
+              'relative h-36 w-full p-4 flex flex-col justify-between transition-all',
+              !coverUrl &&
+                (event.tone ??
+                  'from-[var(--cx-brand-soft)] to-[var(--cx-surface-2)] bg-gradient-to-br'),
             )}
-            {event.format && (
-              <Badge variant="outline">
-                {isOnline ? <Globe className="size-3" /> : <MapPin className="size-3" />}
-                {event.format}
-              </Badge>
+            style={
+              coverUrl
+                ? {
+                    backgroundImage: `url(${coverUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }
+                : undefined
+            }
+          >
+            {coverUrl ? (
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30" />
+            ) : (
+              <>
+                <span className="pointer-events-none absolute -left-8 -top-10 size-32 rounded-full bg-white/15 blur-2xl" />
+                <span className="pointer-events-none absolute -bottom-12 right-6 size-36 rounded-full bg-black/10 blur-2xl" />
+              </>
             )}
-          </div>
-        </div>
 
-        <div className="flex flex-col gap-4 p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <DialogTitle className="text-2xl font-semibold leading-tight text-[var(--cx-text-1)]">
-                {event.title}
-              </DialogTitle>
-              {event.host ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <Avatar className="size-5 bg-[var(--cx-brand)] text-white">
-                    {event.hostAvatar ? (
-                      <AvatarImage src={event.hostAvatar} alt={event.host} />
-                    ) : (
-                      <AvatarFallback className="text-[10px] text-white">
-                        {event.hostInitials ?? 'H'}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <span className="text-xs font-medium text-[var(--cx-text-2)]">
-                    Hosted by {event.host}
-                  </span>
-                </div>
-              ) : null}
+            <div className="flex items-center justify-between z-10">
+              <span className="rounded-md bg-white/90 px-2.5 py-1 text-xs font-bold text-[#322b3a] shadow-sm">
+                {event.month} {event.date}
+              </span>
+              <DialogClose className="bg-white/90 text-[#322b3a] hover:bg-white rounded-full p-1" />
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
-              {onExportIcs ? (
+            <div className="flex items-center gap-2 z-10">
+              {event.category && (
+                <Badge variant="brand">{event.category.toUpperCase()}</Badge>
+              )}
+              {event.format && (
+                <Badge variant="outline">
+                  {isOnline ? <Globe className="size-3" /> : <MapPin className="size-3" />}
+                  {event.format}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <DialogTitle className="text-2xl font-semibold leading-tight text-[var(--cx-text-1)]">
+                  {event.title}
+                </DialogTitle>
+                {event.host ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Avatar className="size-5 bg-[var(--cx-brand)] text-white">
+                      {event.hostAvatar ? (
+                        <AvatarImage src={event.hostAvatar} alt={event.host} />
+                      ) : (
+                        <AvatarFallback className="text-[10px] text-white">
+                          {event.hostInitials ?? 'H'}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <span className="text-xs font-medium text-[var(--cx-text-2)]">
+                      Hosted by {event.host}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  onClick={handleExportWithToast}
-                  aria-label={`Export .ics calendar invite for ${event.title}`}
-                  title="Export .ics calendar invite"
+                  onClick={() => setShareOpen(true)}
+                  aria-label={`Share ${event.title}`}
+                  title="Share gathering"
                   className="flex size-9 items-center justify-center rounded-full border border-[var(--cx-border-1)] text-[var(--cx-text-3)] transition hover:border-[var(--cx-brand)] hover:text-[var(--cx-brand-strong)] hover:bg-[var(--cx-surface-2)]"
                 >
-                  <Download className="size-4" />
+                  <Share2 className="size-4" />
                 </button>
-              ) : null}
+                {onExportIcs ? (
+                  <button
+                    type="button"
+                    onClick={handleExportWithToast}
+                    aria-label={`Export .ics calendar invite for ${event.title}`}
+                    title="Export .ics calendar invite"
+                    className="flex size-9 items-center justify-center rounded-full border border-[var(--cx-border-1)] text-[var(--cx-text-3)] transition hover:border-[var(--cx-brand)] hover:text-[var(--cx-brand-strong)] hover:bg-[var(--cx-surface-2)]"
+                  >
+                    <Download className="size-4" />
+                  </button>
+                ) : null}
               {onSave ? (
                 <button
                   type="button"
@@ -260,5 +303,11 @@ export function EventDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+    <ShareEventDialog
+      event={event}
+      open={shareOpen}
+      onOpenChange={setShareOpen}
+    />
+    </>
   )
 }

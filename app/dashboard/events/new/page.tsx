@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { Badge, Button, Chip, Input, NumberInput, Textarea } from '@/components/ui'
+import { CoverPicker, PRESET_GRADIENTS } from '@/components/events'
 import { createHostedEventAction } from '@/app/actions/hosted-events'
 import { ROUTES, eventPath } from '@/config/routes'
 import { showSuccessToast } from '@/lib/toast'
@@ -56,6 +57,7 @@ export default function NewEventPage() {
   const [format, setFormat] = useState<string>('social')
   const [category, setCategory] = useState<string>('General')
   const [type, setType] = useState<'virtual' | 'irl'>('virtual')
+  const [coverImage, setCoverImage] = useState<string>(PRESET_GRADIENTS[0].value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -110,6 +112,7 @@ export default function NewEventPage() {
         type,
         capacity,
         category: category.toLowerCase(),
+        coverImage,
       })
 
       if (!result.ok || !result.eventId) {
@@ -156,6 +159,19 @@ export default function NewEventPage() {
           className="space-y-6 rounded-[24px] border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] p-5 shadow-[var(--cx-shadow-card)] sm:p-6"
           onSubmit={handleSubmit}
         >
+          {/* Cover Picker */}
+          <div>
+            <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--cx-text-4)]">
+              Cover Image & Theme
+            </label>
+            <CoverPicker
+              value={coverImage}
+              onChange={setCoverImage}
+              previewTitle={title}
+              disabled={saving}
+            />
+          </div>
+
           {/* Title */}
           <div>
             <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--cx-text-4)]">

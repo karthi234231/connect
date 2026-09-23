@@ -1,12 +1,14 @@
 'use client'
 
-import { Bookmark, Calendar, Check, Download, Globe, MapPin, Sparkles, Users } from 'lucide-react'
+import { useState } from 'react'
+import { Bookmark, Calendar, Check, Download, Globe, MapPin, Share2, Sparkles, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/utils/cn'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AvatarGroup, type AvatarGroupItem } from '@/components/ui/avatar-group'
 import { Badge } from '@/components/ui/badge'
 import type { EventItem } from './event'
+import { ShareEventDialog } from './share-event-dialog'
 
 export interface EventCardProps {
   event: EventItem
@@ -31,6 +33,8 @@ export function EventCard({
   onOpen,
   footerAction,
 }: EventCardProps) {
+  const [shareOpen, setShareOpen] = useState(false)
+
   // Generate sample attendee avatar items if not provided explicitly
   const defaultAvatars: AvatarGroupItem[] = Array.from(
     { length: Math.min(event.attendees || 3, 5) },
@@ -59,86 +63,127 @@ export function EventCard({
   const spotsLeft = event.capacity > 0 ? event.capacity - event.attendees : null
   const isFull = event.capacity > 0 && spotsLeft !== null && spotsLeft <= 0
 
+  const isImageUrl = (val?: string) =>
+    val &&
+    (val.startsWith('http://') ||
+      val.startsWith('https://') ||
+      val.startsWith('/') ||
+      val.startsWith('data:'))
+
+  const coverUrl = isImageUrl(event.coverImage)
+    ? event.coverImage
+    : isImageUrl(event.tone)
+      ? event.tone
+      : null
+
   return (
-    <article className="group overflow-hidden rounded-2xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] shadow-[var(--cx-shadow-card)] transition hover:-translate-y-0.5 hover:border-[var(--cx-brand)]/40">
-      {/* Banner / Header Image Area */}
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label={`View details for ${event.title}`}
-        className={cn(
-          'relative block h-[124px] w-full bg-gradient-to-br text-left p-3.5',
-          event.tone ?? 'from-[var(--cx-brand-soft)] to-[var(--cx-surface-2)]',
-        )}
-      >
-        <span className="pointer-events-none absolute -right-6 -top-10 size-28 rounded-full bg-white/15 blur-2xl" />
-        <span className="pointer-events-none absolute -bottom-12 right-12 size-32 rounded-full bg-black/10 blur-2xl" />
+    <>
+      <article className="group overflow-hidden rounded-2xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] shadow-[var(--cx-shadow-card)] transition hover:-translate-y-0.5 hover:border-[var(--cx-brand)]/40">
+        {/* Banner / Header Image Area */}
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={`View details for ${event.title}`}
+          className={cn(
+            'relative block h-[124px] w-full text-left p-3.5 transition-all',
+            !coverUrl && (event.tone ?? 'from-[var(--cx-brand-soft)] to-[var(--cx-surface-2)] bg-gradient-to-br'),
+          )}
+          style={
+            coverUrl
+              ? {
+                  backgroundImage: `url(${coverUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }
+              : undefined
+          }
+        >
+          {coverUrl ? (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30" />
+          ) : (
+            <>
+              <span className="pointer-events-none absolute -right-6 -top-10 size-28 rounded-full bg-white/15 blur-2xl" />
+              <span className="pointer-events-none absolute -bottom-12 right-12 size-32 rounded-full bg-black/10 blur-2xl" />
+            </>
+          )}
 
-        {/* Date Badge Chip */}
-        <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[11px] font-bold text-[#322b3a] shadow-sm backdrop-blur-sm">
-            <Calendar className="size-3 text-[#322b3a]" />
-            {event.month} {event.date}
-          </span>
-
-          {/* Badges: Category & Format */}
-          <div className="flex items-center gap-1.5">
-            {event.category ? (
-              <span className="rounded-md bg-black/25 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
-                {event.category.toUpperCase()}
-              </span>
-            ) : null}
-            {event.format ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-white/20 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-md">
-                {isOnline ? <Globe className="size-3" /> : <MapPin className="size-3" />}
-                {event.format}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Host Avatar Badge Chip on banner bottom */}
-        {event.host ? (
-          <div className="absolute bottom-3 left-3.5 flex items-center gap-1.5 rounded-full bg-black/30 px-2 py-0.5 backdrop-blur-md">
-            <Avatar className="size-4 bg-[var(--cx-brand)] text-white">
-              {event.hostAvatar ? (
-                <AvatarImage src={event.hostAvatar} alt={event.host} />
-              ) : (
-                <AvatarFallback className="text-[9px] text-white">
-                  {event.hostInitials ?? 'H'}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <span className="text-[10px] font-medium text-white/90 truncate max-w-[120px]">
-              {event.host}
+          {/* Date Badge Chip */}
+          <div className="relative z-10 flex items-center justify-between">
+            <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[11px] font-bold text-[#322b3a] shadow-sm backdrop-blur-sm">
+              <Calendar className="size-3 text-[#322b3a]" />
+              {event.month} {event.date}
             </span>
-          </div>
-        ) : null}
-      </button>
 
-      {/* Card Content */}
-      <div className="p-3.5">
-        <div className="flex items-start gap-2 justify-between">
-          <div className="min-w-0 flex-1">
-            <button type="button" onClick={onOpen} className="block text-left">
-              <h2 className="font-display text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[var(--cx-text-1)] transition group-hover:text-[var(--cx-brand-strong)]">
-                {event.title}
-              </h2>
-            </button>
+            {/* Badges: Category & Format */}
+            <div className="flex items-center gap-1.5">
+              {event.category ? (
+                <span className="rounded-md bg-black/25 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
+                  {event.category.toUpperCase()}
+                </span>
+              ) : null}
+              {event.format ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-white/20 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-md">
+                  {isOnline ? <Globe className="size-3" /> : <MapPin className="size-3" />}
+                  {event.format}
+                </span>
+              ) : null}
+            </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {onExportIcs ? (
+          {/* Host Avatar Badge Chip on banner bottom */}
+          {event.host ? (
+            <div className="relative z-10 absolute bottom-3 left-3.5 flex items-center gap-1.5 rounded-full bg-black/30 px-2 py-0.5 backdrop-blur-md">
+              <Avatar className="size-4 bg-[var(--cx-brand)] text-white">
+                {event.hostAvatar ? (
+                  <AvatarImage src={event.hostAvatar} alt={event.host} />
+                ) : (
+                  <AvatarFallback className="text-[9px] text-white">
+                    {event.hostInitials ?? 'H'}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <span className="text-[10px] font-medium text-white/90 truncate max-w-[120px]">
+                {event.host}
+              </span>
+            </div>
+          ) : null}
+        </button>
+
+        {/* Card Content */}
+        <div className="p-3.5">
+          <div className="flex items-start gap-2 justify-between">
+            <div className="min-w-0 flex-1">
+              <button type="button" onClick={onOpen} className="block text-left">
+                <h2 className="font-display text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[var(--cx-text-1)] transition group-hover:text-[var(--cx-brand-strong)]">
+                  {event.title}
+                </h2>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={onExportIcs}
-                aria-label={`Export .ics calendar invite for ${event.title}`}
-                title="Export .ics calendar invite"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShareOpen(true)
+                }}
+                aria-label={`Share ${event.title}`}
+                title="Share event"
                 className="flex size-7 items-center justify-center rounded-full border border-[var(--cx-border-1)] text-[var(--cx-text-3)] transition hover:border-[var(--cx-brand)] hover:text-[var(--cx-brand-strong)] hover:bg-[var(--cx-surface-2)]"
               >
-                <Download className="size-3.5" />
+                <Share2 className="size-3.5" />
               </button>
-            ) : null}
+              {onExportIcs ? (
+                <button
+                  type="button"
+                  onClick={onExportIcs}
+                  aria-label={`Export .ics calendar invite for ${event.title}`}
+                  title="Export .ics calendar invite"
+                  className="flex size-7 items-center justify-center rounded-full border border-[var(--cx-border-1)] text-[var(--cx-text-3)] transition hover:border-[var(--cx-brand)] hover:text-[var(--cx-brand-strong)] hover:bg-[var(--cx-surface-2)]"
+                >
+                  <Download className="size-3.5" />
+                </button>
+              ) : null}
             {onSave ? (
               <button
                 type="button"
@@ -218,5 +263,11 @@ export function EventCard({
           ) : null)}
       </footer>
     </article>
+    <ShareEventDialog
+      event={event}
+      open={shareOpen}
+      onOpenChange={setShareOpen}
+    />
+    </>
   )
 }

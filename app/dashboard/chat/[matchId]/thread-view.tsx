@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Sparkles, X } from 'lucide-react'
+import { ChevronDown, Search, Sparkles, X } from 'lucide-react'
 import { keys } from '@/client/query/keys'
 import { useQuery } from '@/client/query/client'
 import { fetchMatches } from '@/client/api/matches'
@@ -222,6 +222,11 @@ export function ThreadView({
   const bottomRef = useRef<HTMLDivElement>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Thread search states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0)
+
   useEffect(() => {
     void markConversationRead(matchId).catch(() => undefined)
   }, [matchId])
@@ -239,6 +244,25 @@ export function ThreadView({
     ...serverMessages,
     ...pending.filter((p) => !confirmedIds.has(p.id)),
   ]
+
+  const matchingIds = visible
+    .filter((m) =>
+      searchQuery.trim()
+        ? m.content.toLowerCase().includes(searchQuery.trim().toLowerCase())
+        : false,
+    )
+    .map((m) => m.id)
+
+  const matchingCount = matchingIds.length
+  const activeMatchId = matchingIds[activeSearchIndex] ?? null
+
+  useEffect(() => {
+    if (!searchQuery.trim() || !activeMatchId) return
+    const el = document.getElementById(`message-${activeMatchId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [activeMatchId, searchQuery])
 
   useEffect(() => {
     const messageIds = visible
@@ -289,8 +313,10 @@ export function ThreadView({
   }
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [visible.length, connectionState.isPeerTyping])
+    if (!searchQuery.trim()) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [visible.length, connectionState.isPeerTyping, searchQuery])
 
   useEffect(() => {
     if (error) return
@@ -372,7 +398,9 @@ export function ThreadView({
     }
   }
 
-  const chatMessages: ChatMessage[] = visible.map((m) => {
+  const messagesToRender = visible
+
+  const chatMessages: ChatMessage[] = messagesToRender.map((m) => {
     const isSent = m.sender_id === myId
     let status: 'sent' | 'read' | 'pending' | undefined = undefined
     if (isSent) {
@@ -396,8 +424,96 @@ export function ThreadView({
         ? m.attachmentUrl.split('/').pop() ?? 'Attachment'
         : null,
       reactions: messageReactionsMap[m.id] ?? [],
+      searchQuery: searchQuery.trim() || undefined,
+      isActiveSearchMatch: m.id === activeMatchId,
     }
   })
+
+  const renderSearchBar = () => (
+    <>
+      {searchOpen || searchQuery.trim() ? (
+        <div className="relative flex items-center gap-1.5 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-3 py-1.5 transition-all focus-within:border-[var(--cx-brand)]">
+          <Search className="size-3.5 shrink-0 text-[var(--cx-text-3)]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setActiveSearchIndex(0)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearchQuery('')
+                setSearchOpen(false)
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                if (matchingCount > 0) {
+                  setActiveSearchIndex((prev) => (prev + 1) % matchingCount)
+                }
+              }
+            }}
+            placeholder="Search in thread…"
+            className="w-28 bg-transparent text-xs text-[var(--cx-text-1)] outline-none placeholder:text-[var(--cx-text-4)] sm:w-44"
+            autoFocus
+          />
+          {searchQuery.trim() ? (
+            <span className="text-[10px] font-medium text-[var(--cx-text-3)] whitespace-nowrap">
+              {matchingCount > 0
+                ? `${activeSearchIndex + 1}/${matchingCount}`
+                : '0 matches'}
+            </span>
+          ) : null}
+          {matchingCount > 1 ? (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveSearchIndex((prev) =>
+                    prev > 0 ? prev - 1 : matchingCount - 1,
+                  )
+                }
+                aria-label="Previous match"
+                className="rounded p-0.5 text-[var(--cx-text-3)] hover:text-[var(--cx-text-1)]"
+              >
+                <ChevronDown className="size-3 rotate-180" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveSearchIndex((prev) => (prev + 1) % matchingCount)
+                }
+                aria-label="Next match"
+                className="rounded p-0.5 text-[var(--cx-text-3)] hover:text-[var(--cx-text-1)]"
+              >
+                <ChevronDown className="size-3" />
+              </button>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('')
+              setSearchOpen(false)
+            }}
+            aria-label="Close search"
+            className="rounded-full p-0.5 text-[var(--cx-text-4)] hover:text-[var(--cx-text-1)]"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label="Search thread messages"
+          title="Search thread"
+          className="flex size-9 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] text-[var(--cx-text-2)] transition hover:border-[var(--cx-border-2)] hover:text-[var(--cx-text-1)]"
+        >
+          <Search className="size-4" />
+        </button>
+      )}
+    </>
+  )
 
   const body = isLoading ? (
     <LoadingState label="Loading conversation…" />
@@ -417,6 +533,8 @@ export function ThreadView({
             peerName={peer?.fullName}
             endRef={bottomRef}
             onToggleReaction={handleToggleReaction}
+            searchQuery={searchQuery.trim() || undefined}
+            activeMessageId={activeMatchId ?? undefined}
           />
         )}
       </div>
@@ -448,6 +566,7 @@ export function ThreadView({
   if (embedded) {
     return (
       <div className="flex min-h-[440px] w-full flex-col">
+        <div className="mb-2 flex justify-end px-2">{renderSearchBar()}</div>
         {body}
         {profileUserId ? (
           <MemberProfileDialog
@@ -470,10 +589,10 @@ export function ThreadView({
     <main className="cx-page-enter min-h-screen w-full max-w-full overflow-x-hidden bg-[var(--cx-bg)] text-[var(--cx-text-1)]">
       <header className="sticky top-0 z-20 border-b border-[var(--cx-border-1)] bg-[color:var(--cx-bg)/.94] backdrop-blur-xl">
         <div className="mx-auto flex h-[50px] max-w-[1180px] items-center justify-between px-2.5 sm:h-[68px] sm:px-6 lg:px-8">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-[var(--cx-brand)] text-white shadow-[0_8px_24px_rgba(208,164,91,.28)]">
-            <Sparkles className="size-4" />
-          </div>
           <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-[var(--cx-brand)] text-white shadow-[0_8px_24px_rgba(208,164,91,.28)]">
+              <Sparkles className="size-4" />
+            </div>
             {peer?.fullName ? (
               <button
                 type="button"
@@ -493,7 +612,7 @@ export function ThreadView({
                     {peer.fullName.slice(0, 2).toUpperCase()}
                   </div>
                 )}
-                <div className="text-left leading-tight hidden sm:block">
+                <div className="hidden text-left leading-tight sm:block">
                   <span className="block text-sm font-semibold text-[var(--cx-text-1)] hover:underline">
                     {peer.fullName}
                   </span>
@@ -505,6 +624,10 @@ export function ThreadView({
                 </div>
               </button>
             ) : null}
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {renderSearchBar()}
             <MessageComposer connectionState={connectionState.state} />
           </div>
         </div>
@@ -530,3 +653,4 @@ export function ThreadView({
     </main>
   )
 }
+

@@ -79,6 +79,7 @@ export interface PublicEventCard {
   attendeeCount: number
   tags: string[]
   category?: string | null
+  coverImage?: string | null
 }
 
 export interface PublicEventsPage {

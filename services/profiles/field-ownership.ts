@@ -78,6 +78,8 @@ export const PROFILE_FIELD_OWNER: Record<string, FieldOwner> = {
   timezone: 'user',
   commitment_level: 'user',
   work_style: 'user',
+  social_links: 'user',
+  socialLinks: 'user',
   visibility: 'user',
   notification_prefs: 'user',
 }

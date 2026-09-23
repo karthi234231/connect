@@ -33,7 +33,12 @@ import {
   Progress,
   Separator,
 } from '@/components/ui'
-import { ProfileHeader, ProfileSection } from '@/components/profile'
+import {
+  ProfileHeader,
+  ProfileSection,
+  SocialLinksBar,
+  VCardExportButton,
+} from '@/components/profile'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { formatLocation } from '@/utils/format-location'
@@ -300,6 +305,16 @@ export default function ProfilePage() {
                     <p className="text-xs text-[var(--cx-text-2)] leading-relaxed pt-2 border-t border-[var(--cx-border-1)]/60">
                       {data.bio}
                     </p>
+                  )}
+
+                  {(data.social_links || data.socialLinks) && (
+                    <div className="pt-3 border-t border-[var(--cx-border-1)]/60">
+                      <SocialLinksBar
+                        socialLinks={data.social_links ?? data.socialLinks}
+                        size="sm"
+                        showLabels
+                      />
+                    </div>
                   )}
                 </div>
               </CardContent>

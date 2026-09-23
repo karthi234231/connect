@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Paperclip, Send, X } from 'lucide-react'
+import { Code, FileCode, FileText, Paperclip, Send, X } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import {
   ALLOWED_ATTACHMENT_MIME,
@@ -12,6 +12,11 @@ import {
   cleanComposerText,
   COMPOSER_MAX_CHARS,
 } from '@/lib/chat/composer-input'
+import {
+  extractCodeSnippetDraft,
+  getFileCategory,
+  getFileExtensionLabel,
+} from '@/lib/chat/markdown'
 import {
   createChatAttachmentUpload,
   uploadChatAttachment,
@@ -153,31 +158,94 @@ export function MessageComposer({
   const isImageAttachment = (name: string) =>
     /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(name)
 
+  const detectedCodeSnippet = extractCodeSnippetDraft(draft)
+
+  const handleInsertCodeSnippet = () => {
+    if (disabled || sending) return
+    const text = draft.trim()
+    if (text.includes('```')) return
+    const snippetTemplate = text
+      ? `\n\`\`\`ts\n${text}\n\`\`\``
+      : `\`\`\`ts\n// Code snippet\n\n\`\`\``
+    const updated = draft ? `${draft}${snippetTemplate}` : snippetTemplate
+    setDraft(updated)
+    onDraftChange?.(updated)
+    setTimeout(() => {
+      textInputRef.current?.focus()
+    }, 0)
+  }
+
+  const handleRemoveCodeSnippet = () => {
+    const updated = draft.replace(/```[a-zA-Z0-9_+-]*\n?([\s\S]*?)```/g, '').trim()
+    setDraft(updated)
+    onDraftChange?.(updated)
+  }
+
   return (
     <div className="mt-4 flex flex-col gap-2">
-      {attachment ? (
-        <div className="flex items-center gap-2 rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-3 py-2 text-xs">
-          {isImageAttachment(attachment.name) ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={attachment.url}
-              alt="Attachment preview"
-              className="size-8 rounded-md object-cover"
-            />
-          ) : (
-            <Paperclip className="size-4 shrink-0 text-[var(--cx-brand-strong)]" />
-          )}
-          <span className="max-w-[200px] truncate font-medium text-[var(--cx-text-1)] sm:max-w-[300px]">
-            {attachment.name}
-          </span>
-          <button
-            type="button"
-            onClick={() => setAttachment(null)}
-            aria-label="Remove attachment"
-            className="ml-auto rounded-full p-1 text-[var(--cx-text-4)] hover:bg-[var(--cx-surface-3)] hover:text-[var(--cx-text-1)]"
-          >
-            <X className="size-3.5" />
-          </button>
+      {attachment || detectedCodeSnippet ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] p-2 text-xs">
+          {attachment ? (
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-2.5 py-1.5 shadow-xs">
+              {isImageAttachment(attachment.name) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={attachment.url}
+                  alt="Attachment preview"
+                  className="size-7 rounded object-cover"
+                />
+              ) : (
+                <div className="flex size-7 shrink-0 items-center justify-center rounded bg-[var(--cx-surface-3)] text-[var(--cx-brand-strong)]">
+                  {getFileCategory(attachment.name) === 'code' ? (
+                    <FileCode className="size-3.5" />
+                  ) : getFileCategory(attachment.name) === 'pdf' ||
+                    getFileCategory(attachment.name) === 'document' ? (
+                    <FileText className="size-3.5" />
+                  ) : (
+                    <Paperclip className="size-3.5" />
+                  )}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <span className="block max-w-[160px] truncate font-medium text-[var(--cx-text-1)] sm:max-w-[220px]">
+                  {attachment.name}
+                </span>
+                <span className="block text-[9px] font-mono uppercase text-[var(--cx-text-4)]">
+                  {getFileExtensionLabel(attachment.name)} Attachment
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                aria-label="Remove attachment"
+                className="rounded-full p-1 text-[var(--cx-text-4)] hover:bg-[var(--cx-surface-3)] hover:text-[var(--cx-text-1)]"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
+
+          {detectedCodeSnippet ? (
+            <div className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 font-mono text-zinc-100 shadow-xs">
+              <Code className="size-3.5 shrink-0 text-amber-400" />
+              <div className="min-w-0 flex-1 text-left">
+                <span className="inline-block rounded bg-amber-400/20 px-1 text-[9px] font-bold uppercase text-amber-300">
+                  {detectedCodeSnippet.lang}
+                </span>
+                <span className="ml-1.5 max-w-[150px] truncate text-[11px] text-zinc-300 sm:max-w-[200px]">
+                  {detectedCodeSnippet.codePreview}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveCodeSnippet}
+                aria-label="Remove code block"
+                className="rounded-full p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -203,6 +271,16 @@ export function MessageComposer({
             className,
           )}
         />
+        <button
+          type="button"
+          onClick={handleInsertCodeSnippet}
+          disabled={disabled || sending}
+          aria-label="Insert code snippet"
+          title="Insert code block"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] text-[var(--cx-text-2)] transition hover:border-[var(--cx-border-2)] hover:text-[var(--cx-brand-strong)] disabled:opacity-50"
+        >
+          <Code className="size-4" />
+        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -236,4 +314,5 @@ export function MessageComposer({
 }
 
 export default MessageComposer
+
 

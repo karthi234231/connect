@@ -5,6 +5,7 @@
 
 import type { OnboardingStatus } from './onboarding'
 import type { Tables } from '@/types/database'
+import type { SocialLinks } from '@/types/profile'
 import { getIntentLabel, type CollaborationIntent } from './intent'
 import {
   COMMITMENT_LABELS,
@@ -29,6 +30,7 @@ export interface Profile {
   bio?: string | null
   /** User-owned introduction headline (profiles.headline). Provider headline stays on the view model only. */
   headline?: string | null
+  socialLinks?: SocialLinks | null
   skills: string[]
   // City-only location slot — never a fabrication. Absent until the city
   // resolution service fills it, per city-only display policy (timezone is
@@ -55,12 +57,33 @@ export interface Profile {
   onboardingCompletedAt: string | null
 }
 
+function asNullableString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function parseSocialLinks(value: unknown): SocialLinks | null {
+  if (!isRecord(value)) return null
+  const github = asNullableString(value.github)
+  const linkedin = asNullableString(value.linkedin)
+  const twitter = asNullableString(value.twitter)
+  const portfolio = asNullableString(value.portfolio)
+  if (!github && !linkedin && !twitter && !portfolio) return null
+  return { github, linkedin, twitter, portfolio }
+}
+
 export function rowToProfile(row: Partial<Tables<'profiles'>>): Profile {
-  // The generated Database types predate the Session 03 `headline`/`idea`
+  // The generated Database types predate the Session 03 `headline`/`idea`/`social_links`
   // columns (migration 20260903…); the canonical projection selects them, so
   // read through a narrow cast — never fabricate the value.
   const introductionRow = row as Partial<Tables<'profiles'>> & {
     headline?: string | null
+    social_links?: unknown
   }
   return {
     id: row.id ?? '',
@@ -68,6 +91,7 @@ export function rowToProfile(row: Partial<Tables<'profiles'>>): Profile {
     role: row.role ?? '',
     bio: row.bio,
     headline: introductionRow.headline ?? null,
+    socialLinks: parseSocialLinks(introductionRow.social_links),
     skills: row.skills || [],
     city: row.city ?? null,
     availability: (row.availability as Profile['availability'] | null) ?? {
@@ -115,6 +139,7 @@ export function inputToDbUpdate(input: {
   commitmentLevel?: string | null
   workStyle?: string | null
   offering?: { categories: string[] }
+  socialLinks?: SocialLinks | null
 }): Record<string, unknown> {
   const update: Record<string, unknown> = {}
   if (input.bio !== undefined) update.bio = input.bio
@@ -127,6 +152,7 @@ export function inputToDbUpdate(input: {
     update.commitment_level = input.commitmentLevel
   if (input.workStyle !== undefined) update.work_style = input.workStyle
   if (input.offering !== undefined) update.offering = input.offering
+  if (input.socialLinks !== undefined) update.social_links = input.socialLinks
   return update
 }
 
@@ -145,21 +171,11 @@ function asString(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-function asNullableString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0
-    ? value.trim()
-    : null
-}
-
 function asCollabIntents(value: unknown, key: string): CollaborationIntent[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return []
   const arr = (value as Record<string, unknown>)[key]
   if (!Array.isArray(arr)) return []
   return arr.filter((v): v is CollaborationIntent => typeof v === 'string')
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /**

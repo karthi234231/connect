@@ -37,8 +37,8 @@ export const matchFiltersSchema = z
       .string()
       .min(1, { message: 'Skill filter must not be empty.' })
       .max(30, { message: 'Skill filter must be at most 30 characters.' })
-      .optional()
-      .transform((val) => val?.toLowerCase().trim()),
+      .transform((val) => val.toLowerCase().trim())
+      .optional(),
     availabilityDay: daySchema.optional(),
     region: regionSchema.optional(),
     workStyle: workStyleSchema.optional(),

@@ -22,6 +22,7 @@ import {
   EducationCard,
   ExperienceCard,
   InterestsEditor,
+  SocialLinksEditor,
 } from '@/components/profile'
 import { LoadingState } from '@/components/states/LoadingState'
 import { ErrorState } from '@/components/states/ErrorState'
@@ -526,6 +527,13 @@ export default function EditProfilePage() {
               </Button>
             </CardFooter>
           </Card>
+        )}
+
+        {!isLoading && !error && profile && (
+          <SocialLinksEditor
+            initialSocialLinks={profile.socialLinks}
+            className="mt-6"
+          />
         )}
 
         {/*

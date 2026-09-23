@@ -12,6 +12,7 @@ import {
   Check,
   Clock3,
   MapPin,
+  RotateCcw,
   Sparkles,
   Target,
   UsersRound,
@@ -36,6 +37,10 @@ export interface SwipeDeckProps {
   people: Person[]
   onLike?: (person: Person) => SwipeOutcome
   onPass?: (person: Person) => SwipeOutcome
+  /** Restores the previous passed candidate back into the deck. */
+  onUndo?: () => void | Promise<void>
+  /** Whether an undo action is available. */
+  canUndo?: boolean
   onDetail?: (person: Person) => void
   likeLimit?: number
   liked?: string[]
@@ -46,6 +51,8 @@ export function SwipeDeck({
   people,
   onLike,
   onPass,
+  onUndo,
+  canUndo = false,
   onDetail,
   likeLimit,
   liked,
@@ -97,7 +104,19 @@ export function SwipeDeck({
     }
   }, [person, pending, exitDirection, onPass])
 
-  // Keyboard navigation: ArrowLeft (Pass) and ArrowRight (Connect/Like)
+  const handleUndo = useCallback(async () => {
+    if (!onUndo || !canUndo || pending || exitDirection != null) return
+    setPending(true)
+    try {
+      await onUndo()
+    } catch {
+      // Keep card in place on error
+    } finally {
+      setPending(false)
+    }
+  }, [onUndo, canUndo, pending, exitDirection])
+
+  // Keyboard navigation: ArrowLeft (Pass), ArrowRight (Connect/Like), Backspace/U (Undo)
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       // Do not intercept key combinations (e.g. Cmd+Arrow, Alt+Arrow)
@@ -126,12 +145,18 @@ export function SwipeDeck({
       } else if (event.key === 'ArrowRight') {
         event.preventDefault()
         void likeCurrent()
+      } else if (
+        (event.key === 'Backspace' || event.key === 'u' || event.key === 'U') &&
+        canUndo
+      ) {
+        event.preventDefault()
+        void handleUndo()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [likeCurrent, passCurrent])
+  }, [likeCurrent, passCurrent, handleUndo, canUndo])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (pending || exitDirection != null) return
@@ -162,11 +187,22 @@ export function SwipeDeck({
     return (
       <div
         className={cn(
-          'flex min-h-[300px] w-full items-center justify-center rounded-[24px] border border-dashed border-[var(--cx-border-2)] p-6 text-sm text-[var(--cx-text-3)]',
+          'flex min-h-[300px] w-full flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--cx-border-2)] p-6 text-center text-sm text-[var(--cx-text-3)] gap-3',
           className,
         )}
       >
-        No people left in deck.
+        <p>No people left in deck.</p>
+        {canUndo && onUndo ? (
+          <button
+            type="button"
+            onClick={() => void handleUndo()}
+            disabled={pending}
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-4 py-2 text-xs font-semibold text-[var(--cx-brand-strong)] shadow-xs transition hover:bg-[var(--cx-surface-2)] hover:border-[var(--cx-brand)] active:scale-95 disabled:opacity-40"
+          >
+            <RotateCcw className="size-4" />
+            <span>Undo last pass</span>
+          </button>
+        ) : null}
       </div>
     )
   }
@@ -410,7 +446,21 @@ export function SwipeDeck({
 
       {/* Action Buttons & Keyboard Hints */}
       <div className="mt-5 flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center gap-6">
+        <div className="flex items-center justify-center gap-4 sm:gap-6">
+          <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              aria-label="Undo last swipe"
+              disabled={!canUndo || pending}
+              aria-disabled={!canUndo || pending}
+              onClick={() => void handleUndo()}
+              className="flex size-12 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] text-[var(--cx-brand-strong)] shadow-sm transition hover:bg-[var(--cx-surface-2)] hover:border-[var(--cx-brand)] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCcw className="size-5" />
+            </button>
+            <span className="text-[10px] font-medium text-[var(--cx-text-4)]">Undo</span>
+          </div>
+
           <div className="flex flex-col items-center gap-1">
             <button
               type="button"
@@ -442,7 +492,7 @@ export function SwipeDeck({
         </div>
 
         {/* Keyboard shortcut hint badges */}
-        <div className="flex items-center gap-3 text-[10px] text-[var(--cx-text-4)] mt-1">
+        <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] text-[var(--cx-text-4)] mt-1">
           <span className="flex items-center gap-1">
             <kbd className="rounded border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--cx-text-3)]">
               ←
@@ -456,6 +506,17 @@ export function SwipeDeck({
             </kbd>{' '}
             Connect
           </span>
+          {canUndo ? (
+            <>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <kbd className="rounded border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--cx-text-3)]">
+                  Backspace
+                </kbd>{' '}
+                Undo
+              </span>
+            </>
+          ) : null}
         </div>
       </div>
 

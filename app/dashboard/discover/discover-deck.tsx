@@ -1,11 +1,9 @@
 'use client'
 
 // Interactive swipe deck: deck state, refill via the opaque cursor contract,
-// and swipe submission with a per-gesture idempotency key. The generic
-// SwipeDeck (components/people) presents people[0]; this module feeds it the
-// ranked DiscoverCandidateDTO projection and owns every server interaction.
+// filter drawer controls, undo last pass, and swipe submission with a per-gesture idempotency key.
 import { useCallback, useMemo, useState } from 'react'
-import { RefreshCw, Sparkles, UserCheck } from 'lucide-react'
+import { RefreshCw, RotateCcw, SlidersHorizontal, Sparkles, UserCheck, X } from 'lucide-react'
 
 import { fetchDiscoverBatchAction } from '@/app/actions/discover'
 import { performSwipe } from '@/client/api/matches'
@@ -13,13 +11,19 @@ import { ErrorState } from '@/components/states/ErrorState'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { MatchModal } from '@/components/matching/match-modal'
 import {
+  DiscoverFilterDrawer,
+  DEFAULT_DISCOVER_FILTERS,
   MemberProfileDialog,
+  ROLE_OPTIONS,
+  WORK_STYLE_OPTIONS,
   SwipeDeck,
+  type DiscoverFilterState,
   type Person,
 } from '@/components/people'
 import { Badge, Button, EmptyState, Skeleton } from '@/components/ui'
 import { useLiveRegion } from '@/hooks/use-live-region'
-import { showErrorToast, showSuccessToast } from '@/lib/toast'
+import { showErrorToast, showInfoToast, showSuccessToast } from '@/lib/toast'
+import type { MatchFiltersInput } from '@/services/matching/filters.schema'
 import type {
   DiscoverBatch,
   DiscoverCandidateDTO,
@@ -98,6 +102,11 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
   const [items, setItems] = useState<DiscoverCandidateDTO[]>(() => [
     ...initialBatch.items,
   ])
+  const [passedStack, setPassedStack] = useState<DiscoverCandidateDTO[]>([])
+  const [filters, setFilters] = useState<DiscoverFilterState>(
+    DEFAULT_DISCOVER_FILTERS,
+  )
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [cursor, setCursor] = useState<string | null>(
     () => initialBatch.nextCursorToken,
   )
@@ -117,14 +126,123 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
     name: string
   } | null>(null)
 
-  const top = items[0] ?? null
-  const exhausted = items.length === 0 && cursor == null
-  const remaining = useMemo(() => items.length, [items.length])
+  const activeFilterCount = useMemo(() => {
+    return (
+      filters.intents.length +
+      (filters.role ? 1 : 0) +
+      (filters.region ? 1 : 0) +
+      (filters.workStyle ? 1 : 0)
+    )
+  }, [filters])
 
-  const deckPeople = useMemo(() => items.map(toPerson), [items])
+  const getRoleLabel = useCallback((roleValue: string) => {
+    const found = ROLE_OPTIONS.find((r: { value: string; label: string }) => r.value === roleValue)
+    return found ? found.label : roleValue
+  }, [])
+
+  const getWorkStyleLabel = useCallback((styleValue: string) => {
+    const found = WORK_STYLE_OPTIONS.find((w: { value: string; label: string }) => w.value === styleValue)
+    return found ? found.label : styleValue
+  }, [])
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      // 1. Role filter
+      if (filters.role && item.profile.role !== filters.role) {
+        return false
+      }
+
+      // 2. Region filter
+      if (filters.region) {
+        const tz = item.profile.timezone || ''
+        if (!tz.startsWith(`${filters.region}/`)) {
+          return false
+        }
+      }
+
+      // 3. WorkStyle filter
+      if (filters.workStyle && item.profile.workStyle !== filters.workStyle) {
+        return false
+      }
+
+      // 4. Intent filter (Co-founder, Collaborator, Advisor, Mentor)
+      if (filters.intents.length > 0) {
+        const personObj = toPerson(item)
+        const offering = personObj.offering ?? []
+        const lookingFor = personObj.lookingFor ?? []
+        const matchesAnyIntent = filters.intents.some((intent) => {
+          const lowerIntent = intent.toLowerCase()
+
+          if (lowerIntent === 'co-founder') {
+            return (
+              personObj.role.toLowerCase().includes('founder') ||
+              offering.some((o) => o.toLowerCase().includes('founder')) ||
+              lookingFor.some((l) => l.toLowerCase().includes('founder')) ||
+              personObj.note.toLowerCase().includes('founder') ||
+              personObj.note.toLowerCase().includes('co-founder')
+            )
+          }
+
+          if (lowerIntent === 'collaborator') {
+            return (
+              ['engineer', 'designer', 'product', 'growth', 'operations', 'data_ml'].some(
+                (r) => personObj.role.toLowerCase().includes(r),
+              ) ||
+              offering.length > 0 ||
+              personObj.note.toLowerCase().includes('collaborat') ||
+              personObj.note.toLowerCase().includes('build')
+            )
+          }
+
+          if (lowerIntent === 'advisor') {
+            return (
+              personObj.note.toLowerCase().includes('advisor') ||
+              personObj.note.toLowerCase().includes('advis') ||
+              personObj.tags.some((t) => t.toLowerCase().includes('advis')) ||
+              personObj.experience.toLowerCase().includes('part_time')
+            )
+          }
+
+          if (lowerIntent === 'mentor') {
+            return (
+              personObj.note.toLowerCase().includes('mentor') ||
+              personObj.note.toLowerCase().includes('coach') ||
+              personObj.tags.some((t) => t.toLowerCase().includes('mentor'))
+            )
+          }
+
+          return false
+        })
+
+        if (!matchesAnyIntent) return false
+      }
+
+      return true
+    })
+  }, [items, filters])
+
+  const top = filteredItems[0] ?? null
+  const exhausted = filteredItems.length === 0 && cursor == null
+  const remaining = useMemo(() => filteredItems.length, [filteredItems.length])
+
+  const deckPeople = useMemo(() => filteredItems.map(toPerson), [filteredItems])
   const candidateById = useMemo(
     () => new Map(items.map((item) => [item.profile.id, item])),
     [items],
+  )
+
+  const buildServerFilters = useCallback(
+    (filterState: DiscoverFilterState): MatchFiltersInput => {
+      const result: MatchFiltersInput = { skill: undefined }
+      if (filterState.role)
+        result.role = filterState.role as MatchFiltersInput['role']
+      if (filterState.region)
+        result.region = filterState.region as MatchFiltersInput['region']
+      if (filterState.workStyle)
+        result.workStyle = filterState.workStyle as MatchFiltersInput['workStyle']
+      return result
+    },
+    [],
   )
 
   const refill = useCallback(async () => {
@@ -132,7 +250,11 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
     setLoadingMore(true)
     setLoadError(false)
     try {
-      const batch = (await fetchDiscoverBatchAction(cursor)) as DeckBatch
+      const serverFilters = buildServerFilters(filters)
+      const batch = (await fetchDiscoverBatchAction(
+        cursor,
+        serverFilters,
+      )) as DeckBatch
       setItems((current) => [...current, ...batch.items])
       setCursor(batch.nextCursorToken)
     } catch {
@@ -140,7 +262,61 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
     } finally {
       setLoadingMore(false)
     }
-  }, [cursor, loadingMore])
+  }, [cursor, loadingMore, filters, buildServerFilters])
+
+  const handleApplyFilters = useCallback(
+    async (newFilters: DiscoverFilterState) => {
+      setFilters(newFilters)
+      setLoadingMore(true)
+      setLoadError(false)
+      try {
+        const serverFilters = buildServerFilters(newFilters)
+        const batch = (await fetchDiscoverBatchAction(
+          null,
+          serverFilters,
+        )) as DeckBatch
+        setItems(batch.items)
+        setCursor(batch.nextCursorToken)
+        announce('Discover deck updated with filtered candidates.')
+      } catch {
+        setLoadError(true)
+        showErrorToast('Failed to apply candidate filters. Please try again.')
+      } finally {
+        setLoadingMore(false)
+      }
+    },
+    [announce, buildServerFilters],
+  )
+
+  const handleResetFilters = useCallback(async () => {
+    setFilters(DEFAULT_DISCOVER_FILTERS)
+    setLoadingMore(true)
+    setLoadError(false)
+    try {
+      const batch = (await fetchDiscoverBatchAction(null)) as DeckBatch
+      setItems(batch.items)
+      setCursor(batch.nextCursorToken)
+      announce('Discover filters reset.')
+    } catch {
+      setLoadError(true)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [announce])
+
+  const handleUndo = useCallback(async () => {
+    if (passedStack.length === 0) return
+    const lastCandidate = passedStack[passedStack.length - 1]
+    if (!lastCandidate) return
+
+    setPassedStack((prev) => prev.slice(0, -1))
+    setItems((current) => [lastCandidate, ...current])
+    showInfoToast(
+      'Swipe undone',
+      `Restored ${lastCandidate.profile.fullName} back to your deck.`,
+    )
+    announce(`Restored ${lastCandidate.profile.fullName} to deck.`)
+  }, [passedStack, announce])
 
   async function handleSwipe(person: Person, action: 'like' | 'pass') {
     if (busyId != null) return
@@ -156,10 +332,14 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
         crypto.randomUUID(),
       )
       setItems((current) => current.filter((item) => item.profile.id !== id))
+      if (action === 'pass') {
+        setPassedStack((prev) => [...prev, candidate])
+      }
       if (result.matchCreated) {
         setMatchedState({
           matchedName: candidate.profile.fullName,
-          matchedRole: getIntentLabel(candidate.profile.role) ?? candidate.profile.role,
+          matchedRole:
+            getIntentLabel(candidate.profile.role) ?? candidate.profile.role,
           matchedAvatarUrl: candidate.profile.avatarUrl,
           matchedInitials: initialsForName(candidate.profile.fullName || '··'),
           matchedTone: toneForName(candidate.profile.fullName),
@@ -189,14 +369,91 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
         title="Meet your people"
         description="Swipe through aligned profiles — every card is server-ranked."
         actions={
-          remaining > 0 ? (
-            <Badge variant="brand" pulse className="cx-fade-in">
-              <Sparkles className="size-3" />
-              {remaining} aligned deck profiles
-            </Badge>
-          ) : null
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<SlidersHorizontal className="size-4" />}
+              onClick={() => setFilterDrawerOpen(true)}
+            >
+              Filter {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+            </Button>
+            {remaining > 0 ? (
+              <Badge
+                variant="brand"
+                pulse
+                className="cx-fade-in hidden sm:inline-flex"
+              >
+                <Sparkles className="size-3" />
+                {remaining} aligned
+              </Badge>
+            ) : null}
+          </div>
         }
       />
+
+      {/* Active Filters Summary Bar */}
+      {activeFilterCount > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)]/60 px-4 py-2 text-xs">
+          <span className="font-semibold text-[var(--cx-text-3)]">
+            Active filters:
+          </span>
+          {filters.intents.map((intent) => (
+            <Badge
+              key={intent}
+              variant="brand"
+              className="cursor-pointer gap-1"
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  intents: f.intents.filter((i) => i !== intent),
+                }))
+              }
+            >
+              <span>Intent: {intent}</span>
+              <X className="size-3" />
+            </Badge>
+          ))}
+          {filters.role ? (
+            <Badge
+              variant="brand"
+              className="cursor-pointer gap-1"
+              onClick={() => setFilters((f) => ({ ...f, role: null }))}
+            >
+              <span>Role: {getRoleLabel(filters.role)}</span>
+              <X className="size-3" />
+            </Badge>
+          ) : null}
+          {filters.region ? (
+            <Badge
+              variant="brand"
+              className="cursor-pointer gap-1"
+              onClick={() => setFilters((f) => ({ ...f, region: null }))}
+            >
+              <span>Region: {filters.region}</span>
+              <X className="size-3" />
+            </Badge>
+          ) : null}
+          {filters.workStyle ? (
+            <Badge
+              variant="brand"
+              className="cursor-pointer gap-1"
+              onClick={() => setFilters((f) => ({ ...f, workStyle: null }))}
+            >
+              <span>Style: {getWorkStyleLabel(filters.workStyle)}</span>
+              <X className="size-3" />
+            </Badge>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={handleResetFilters}
+          >
+            Clear all
+          </Button>
+        </div>
+      ) : null}
 
       {matchedState ? (
         <div className="mb-6 cx-scale-up rounded-[24px] border border-[color-mix(in_srgb,var(--cx-brand)_40%,transparent)] bg-[var(--cx-surface-2)]/90 backdrop-blur-md p-5 shadow-[var(--cx-shadow-glow)]">
@@ -245,17 +502,35 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
             <EmptyState
               icon={<Sparkles className="size-8" />}
               title="All caught up!"
-              description="No more profiles right now — check back soon for fresh AI-ranked recommendations."
+              description="No more candidate profiles matching your current criteria — try adjusting your filters or restore your last passed candidate."
               action={
-                cursor != null ? (
-                  <Button
-                    variant="secondary"
-                    icon={<RefreshCw className="size-4" />}
-                    onClick={() => void refill()}
-                  >
-                    Refresh deck
-                  </Button>
-                ) : null
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {passedStack.length > 0 ? (
+                    <Button
+                      variant="primary"
+                      icon={<RotateCcw className="size-4" />}
+                      onClick={() => void handleUndo()}
+                    >
+                      Undo Last Pass
+                    </Button>
+                  ) : null}
+                  {activeFilterCount > 0 ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => void handleResetFilters()}
+                    >
+                      Reset filters
+                    </Button>
+                  ) : cursor != null ? (
+                    <Button
+                      variant="secondary"
+                      icon={<RefreshCw className="size-4" />}
+                      onClick={() => void refill()}
+                    >
+                      Refresh deck
+                    </Button>
+                  ) : null}
+                </div>
               }
             />
           </div>
@@ -287,6 +562,8 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
             people={deckPeople}
             onLike={(person) => handleSwipe(person, 'like')}
             onPass={(person) => handleSwipe(person, 'pass')}
+            onUndo={handleUndo}
+            canUndo={passedStack.length > 0}
             onDetail={(person) =>
               setProfileTarget({ userId: person.id, name: person.name })
             }
@@ -332,6 +609,14 @@ export function DiscoverDeck({ initialBatch }: { initialBatch: DeckBatch }) {
           matchId={matchedState.matchId}
         />
       ) : null}
+
+      <DiscoverFilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        filters={filters}
+        onApplyFilters={handleApplyFilters}
+        onResetFilters={handleResetFilters}
+      />
     </div>
   )
 }

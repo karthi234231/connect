@@ -1,5 +1,12 @@
 import type { Tables } from '@/types/database'
 
+export interface SocialLinks {
+  github?: string | null
+  linkedin?: string | null
+  twitter?: string | null
+  portfolio?: string | null
+}
+
 export type ProfileRow = Tables<'profiles'>
 
 export type ProfileSummary = Pick<
@@ -8,6 +15,8 @@ export type ProfileSummary = Pick<
 > & {
   /** User-owned introduction headline (profiles.headline, Session 03). */
   headline: string | null
+  socialLinks?: SocialLinks | null
+  social_links?: SocialLinks | null
 }
 
 export type ProfileDraft = Partial<
@@ -24,7 +33,10 @@ export type ProfileDraft = Partial<
     | 'looking_for'
     | 'offering'
   >
->
+> & {
+  socialLinks?: SocialLinks | null
+  social_links?: SocialLinks | null
+}
 
 export function initialsForName(name: string): string {
   return name
@@ -35,3 +47,4 @@ export function initialsForName(name: string): string {
     .slice(0, 2)
     .toUpperCase()
 }
+

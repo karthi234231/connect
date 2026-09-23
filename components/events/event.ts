@@ -14,6 +14,7 @@ export type EventItem = {
   capacity: number
   category?: string
   tone?: string
+  coverImage?: string
   tags: string[]
   startsAt?: string
   isHost?: boolean

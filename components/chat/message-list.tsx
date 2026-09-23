@@ -21,6 +21,8 @@ export type ChatMessage = {
   attachmentUrl?: string | null
   attachmentName?: string | null
   reactions?: ReactionSummary[]
+  searchQuery?: string
+  isActiveSearchMatch?: boolean
 }
 
 export interface MessageListProps {
@@ -38,6 +40,10 @@ export interface MessageListProps {
   peerTone?: string
   peerName?: string
   className?: string
+  /** Highlight search matches inside messages */
+  searchQuery?: string
+  /** Active selected search match message ID */
+  activeMessageId?: string
 }
 
 export function MessageList({
@@ -51,6 +57,8 @@ export function MessageList({
   peerTone,
   peerName,
   className,
+  searchQuery,
+  activeMessageId,
 }: MessageListProps): ReactNode {
   const internalEndRef = useRef<HTMLDivElement>(null)
 
@@ -95,6 +103,7 @@ export function MessageList({
                 return (
                   <MessageBubble
                     key={message.id}
+                    id={message.id}
                     text={message.text}
                     time={message.time}
                     sent={message.sent}
@@ -110,6 +119,11 @@ export function MessageList({
                       onToggleReaction
                         ? (emoji) => onToggleReaction(message.id, emoji)
                         : undefined
+                    }
+                    searchQuery={searchQuery ?? message.searchQuery}
+                    isActiveSearchMatch={
+                      message.isActiveSearchMatch ||
+                      (Boolean(activeMessageId) && activeMessageId === message.id)
                     }
                   />
                 )
