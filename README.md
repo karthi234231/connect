@@ -2,6 +2,10 @@
 
 **Find your people. Build what matters.**
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/karthi234231/connect)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-181717?style=flat&logo=github)](https://github.com/karthi234231/connect)
+[![Live Demo](https://img.shields.io/badge/Production-Live--Demo-000000?style=flat&logo=vercel)](https://connect-karthi234231.vercel.app)
+
 Connect matches people by **intent** — co-founders, co-builders, and crew for your next
 idea or event. The product surface is a dark, brand-led web app (Discover · Events ·
 Connect · Messages · Ideas · Profile) on top of a Supabase-backed domain layer with
@@ -12,10 +16,14 @@ Next.js 16 (App Router, Turbopack) · React 19 · TypeScript 6 · Tailwind v4
 Supabase (Postgres + Auth + Storage + Realtime) · Upstash Redis · Ably · Resend · PostHog · Sentry
 ```
 
+- **GitHub Repository**: [https://github.com/karthi234231/connect](https://github.com/karthi234231/connect)
+- **Live Enterprise Application**: [https://connect-karthi234231.vercel.app](https://connect-karthi234231.vercel.app)
+
 ---
 
 ## Table of contents
 
+- [Live Deployment](#live-deployment)
 - [Quick start](#quick-start)
 - [Scripts](#scripts)
 - [Environment](#environment)
@@ -26,6 +34,16 @@ Supabase (Postgres + Auth + Storage + Realtime) · Upstash Redis · Ably · Rese
 - [Security model](#security-model)
 - [Known gaps](#known-gaps)
 - [Documentation map](#documentation-map)
+
+---
+
+## Live Deployment
+
+Connect is ready for single-click enterprise production deployment:
+
+1. **GitHub Repository**: [`https://github.com/karthi234231/connect`](https://github.com/karthi234231/connect)
+2. **Production App URL**: [`https://connect-karthi234231.vercel.app`](https://connect-karthi234231.vercel.app)
+3. **One-Click Deploy**: Click the **Deploy with Vercel** button above or import `karthi234231/connect` directly on [Vercel](https://vercel.com/new).
 
 ---
 
