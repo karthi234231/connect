@@ -1,0 +1,136 @@
+{
+  "me": { "id": "me", "name": "You", "initials": "YO" },
+  "threads": [
+    {
+      "id": "t1",
+      "peer": {
+        "id": "u_maya",
+        "name": "Maya Okafor",
+        "role": "Product Designer",
+        "avatarUrl": "/avatars/maya.png"
+      },
+      "initials": "MO",
+      "tone": "bg-rose-200",
+      "kind": "Direct",
+      "unread": 2,
+      "messages": [
+        {
+          "id": "t1-m1",
+          "senderId": "u_maya",
+          "content": "Hey! Loved your portfolio \uD83D\uDE4C the onboarding case study was so clean.",
+          "time": "9:41 AM",
+          "reactions": [{ "emoji": "\u2764\uFE0F", "count": 1, "reactedByViewer": true }]
+        },
+        {
+          "id": "t1-m2",
+          "senderId": "me",
+          "content": "Thank you! That one took forever to get right \uD83D\uDE05",
+          "time": "9:43 AM",
+          "status": "read"
+        },
+        {
+          "id": "t1-m3",
+          "senderId": "u_maya",
+          "content": "Worth it. Here's the trail I mentioned for the weekend \uD83D\uDC47",
+          "time": "9:44 AM"
+        },
+        {
+          "id": "t1-m4",
+          "senderId": "u_maya",
+          "content": "",
+          "time": "9:44 AM",
+          "attachmentUrl": "/attachments/sunset-hike.png",
+          "attachmentName": "sunset-hike.png",
+          "reactions": [
+            { "emoji": "\uD83D\uDD25", "count": 2, "reactedByViewer": false },
+            { "emoji": "\u2764\uFE0F", "count": 1, "reactedByViewer": true }
+          ]
+        },
+        {
+          "id": "t1-m5",
+          "senderId": "me",
+          "content": "Whoa, that's stunning. I'm in \u2600\uFE0F",
+          "time": "9:46 AM",
+          "status": "read"
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "peer": {
+        "id": "u_dev",
+        "name": "Dev Patel",
+        "role": "Software Engineer",
+        "avatarUrl": "/avatars/dev.png"
+      },
+      "initials": "DP",
+      "tone": "bg-sky-200",
+      "kind": "Direct",
+      "unread": 0,
+      "messages": [
+        {
+          "id": "t2-m1",
+          "senderId": "u_dev",
+          "content": "Did you get a chance to look at the `useDebounce` snippet?",
+          "time": "Mon"
+        },
+        {
+          "id": "t2-m2",
+          "senderId": "me",
+          "content": "Yeah, I'd pull it into a hook:\n```ts\nfunction useDebounced<T>(value: T, ms = 300) {\n  const [v, setV] = useState(value)\n  useEffect(() => {\n    const id = setTimeout(() => setV(value), ms)\n    return () => clearTimeout(id)\n  }, [value, ms])\n  return v\n}\n```",
+          "time": "Mon",
+          "status": "read"
+        },
+        {
+          "id": "t2-m3",
+          "senderId": "u_dev",
+          "content": "Oh nice, that's way cleaner. The `useMemo` I had there was overkill.",
+          "time": "Mon",
+          "reactions": [{ "emoji": "\uD83D\uDC4D", "count": 1, "reactedByViewer": true }]
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "peer": {
+        "id": "grp_weekend",
+        "name": "Weekend Crew",
+        "role": null,
+        "avatarUrl": null
+      },
+      "initials": "WC",
+      "tone": "bg-amber-200",
+      "kind": "Group",
+      "memberCount": 3,
+      "unread": 1,
+      "messages": [
+        {
+          "id": "t3-m1",
+          "senderId": "u_sana",
+          "senderName": "Sana",
+          "senderInitials": "SA",
+          "senderTone": "bg-emerald-200",
+          "content": "Still on for Saturday?",
+          "time": "Tue"
+        },
+        {
+          "id": "t3-m2",
+          "senderId": "u_dev",
+          "senderName": "Dev",
+          "senderInitials": "DP",
+          "senderTone": "bg-sky-200",
+          "content": "I'm in! What time?",
+          "time": "Tue",
+          "reactions": [{ "emoji": "\uD83C\uDF89", "count": 1, "reactedByViewer": false }]
+        },
+        {
+          "id": "t3-m3",
+          "senderId": "me",
+          "content": "Let's say 10am at the trailhead \u2600\uFE0F",
+          "time": "Tue",
+          "status": "sent"
+        }
+      ]
+    }
+  ]
+}

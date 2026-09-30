@@ -160,11 +160,24 @@ export function applyReactionToggle(
   current: readonly ReactionRecord[],
   toggle: ReactionToggle,
 ): ReactionRecord[] {
+  const matches = (row: ReactionRecord): boolean =>
+    row.messageId === toggle.messageId && row.userId === toggle.userId
+
+  const existing = current.find(matches)
+
+  // Idempotency (§343 / AC-MSG-004): a replayed or own-echo'd envelope already
+  // reflected in the state is a no-op that returns the SAME reference, so a
+  // reducer (React StrictMode re-invokes updaters) bails out of the re-render
+  // instead of churning a fresh array on every echo.
+  if (toggle.active && existing?.emoji === toggle.emoji) {
+    return current as ReactionRecord[]
+  }
+  if (!toggle.active && existing === undefined) {
+    return current as ReactionRecord[]
+  }
+
   // Replace semantics: the user's previous emoji (if any) always goes.
-  const without = current.filter(
-    (row) =>
-      !(row.messageId === toggle.messageId && row.userId === toggle.userId),
-  )
+  const without = current.filter((row) => !matches(row))
 
   if (!toggle.active) return without
 
@@ -174,7 +187,11 @@ export function applyReactionToggle(
       messageId: toggle.messageId,
       userId: toggle.userId,
       emoji: toggle.emoji,
-      createdAt: toggle.createdAt ?? new Date().toISOString(),
+      // Keep a replaced row's timestamp so repeated echoes never churn the
+      // row's place in the projection; fall back to the envelope's time, then
+      // the client clock, for a genuinely new reaction.
+      createdAt:
+        toggle.createdAt ?? existing?.createdAt ?? new Date().toISOString(),
     },
   ]
 }

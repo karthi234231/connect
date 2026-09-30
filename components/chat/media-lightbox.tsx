@@ -16,27 +16,78 @@ export function MediaLightbox({
   isOpen,
   onClose,
 }: MediaLightboxProps): ReactNode {
+  const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useEffect(() => {
     if (!isOpen) return
 
-    closeButtonRef.current?.focus()
+    previousFocusRef.current = document.activeElement as HTMLElement | null
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose()
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const dialog = dialogRef.current
+      if (!dialog) return
+
+      const focusables = Array.from(
+        dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]'),
+      )
+      if (focusables.length === 0) return
+
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const activeElement = document.activeElement as HTMLElement | null
+      const isOnFirst = activeElement === first
+      const isOnLast = activeElement === last
+      const isOutside = activeElement === null || !focusables.includes(activeElement)
+
+      if (event.shiftKey) {
+        if (isOnFirst || isOutside) {
+          event.preventDefault()
+          last.focus()
+        }
+        return
+      }
+
+      if (isOnLast || isOutside) {
+        event.preventDefault()
+        first.focus()
       }
     }
 
+    closeButtonRef.current?.focus()
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousFocusRef.current?.focus()
+      previousFocusRef.current = null
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={alt}

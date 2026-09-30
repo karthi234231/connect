@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Search, Sparkles, X } from 'lucide-react'
+import { ChevronDown, Loader2, Search, Sparkles, X } from 'lucide-react'
 import { keys } from '@/client/query/keys'
 import { useQuery } from '@/client/query/client'
 import { fetchMatches } from '@/client/api/matches'
@@ -9,6 +9,7 @@ import { MemberProfileDialog } from '@/components/people'
 import {
   dismissRelationshipSuggestionAction,
   getDismissedSuggestionSourcesAction,
+  getMessagesAction,
 } from '@/app/actions/chat'
 import {
   getChatReactions,
@@ -21,6 +22,7 @@ import {
 import {
   applyReactionToggle,
   groupReactionsByMessage,
+  isMessageReaction,
   type MessageReaction,
   type ReactionRecord,
 } from '@/lib/chat/reactions'
@@ -30,8 +32,6 @@ import {
 } from '@/components/chat/MessageComposer'
 import { MessageList, type ChatMessage } from '@/components/chat/message-list'
 import { ErrorState } from '@/components/states/ErrorState'
-import { LoadingState } from '@/components/states/LoadingState'
-import { formatRelativeDate } from '@/utils/format-date'
 import { cn } from '@/utils/cn'
 import {
   RELATIONSHIP_SUGGESTION_SOURCES,
@@ -39,6 +39,16 @@ import {
 } from '@/lib/chat/momentum'
 import { useChatConnection } from '@/hooks/use-chat-connection'
 import { useLiveRegion } from '@/hooks/use-live-region'
+import {
+  mergeRealtimeMessage,
+  optimisticMessageId,
+  type MessagePayload,
+  type ReactionPayload,
+  type ReceiptPayload,
+} from '@/lib/chat/realtime'
+import { extractClientMessageId } from '@/lib/chat/message-state'
+import type { MessageSummary } from '@/types/message'
+import type { Message } from '@/services/chat/mappers'
 
 const SUGGESTION_LABELS: Record<RelationshipSuggestionSource, string> = {
   shared_interest: 'Shared interests',
@@ -50,6 +60,101 @@ const SUGGESTION_LABELS: Record<RelationshipSuggestionSource, string> = {
   conversation_gap: 'Conversation follow-up',
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** µ-04 — throttle `sendTyping(true)` publishes during continuous typing. */
+const TYPING_PUBLISH_INTERVAL_MS = 1000
+/** M-03 — pending/confirmed correlation window (server clock vs client clock). */
+const PENDING_CONFIRM_TOLERANCE_MS = 5 * 60 * 1000
+
+const clockTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+const shortDayFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+})
+
+function localDayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+}
+
+function startOfLocalDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+}
+
+/** "Today" / "Yesterday" / "Sep 24" chip label for a calendar-day group. */
+function dayLabel(iso: string, now: Date): string | undefined {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return undefined
+  const diff = Math.round((startOfLocalDay(now) - startOfLocalDay(date)) / DAY_MS)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Yesterday'
+  return shortDayFormatter.format(date)
+}
+
+/**
+ * M-08 — group a chronologically ordered (newest-last) message list into
+ * per-calendar-day runs, each with a divider chip label.
+ */
+function groupThreadMessagesByDay(
+  messages: readonly ThreadMessage[],
+): { groups: ThreadMessage[][]; labels: (string | undefined)[] } {
+  const groups: ThreadMessage[][] = []
+  const labels: (string | undefined)[] = []
+  const now = new Date()
+  let currentKey: string | null = null
+  let current: ThreadMessage[] = []
+
+  for (const message of messages) {
+    const date = new Date(message.created_at)
+    if (Number.isNaN(date.getTime())) continue
+    const key = localDayKey(date)
+    if (currentKey === null || key !== currentKey) {
+      if (current.length > 0) {
+        groups.push(current)
+        labels.push(dayLabel(current[0]!.created_at, now))
+      }
+      current = [message]
+      currentKey = key
+    } else {
+      current.push(message)
+    }
+  }
+  if (current.length > 0) {
+    groups.push(current)
+    labels.push(dayLabel(current[0]!.created_at, now))
+  }
+  return { groups, labels }
+}
+
+/** `client/api/chat.ts#watchMessages` row → local thread row. */
+function mapSummaryToThread(m: MessageSummary): ThreadMessage {
+  return {
+    id: m.id,
+    content: m.content,
+    created_at: m.created_at,
+    sender_id: m.sender_id,
+    attachmentUrl: m.attachment_url ?? null,
+    read_at: m.read_at ?? null,
+  }
+}
+
+/** Server `Message` (camelCase, `services/chat/mappers.ts`) → local thread row. */
+function serviceMessageToThread(m: Message): ThreadMessage {
+  return {
+    id: m.id,
+    content: m.content,
+    created_at: m.createdAt,
+    sender_id: m.senderId,
+    attachmentUrl: m.attachmentUrl ?? null,
+    read_at: m.readAt ?? null,
+  }
+}
+
 interface ThreadMessage {
   id: string
   content: string
@@ -57,7 +162,10 @@ interface ThreadMessage {
   sender_id: string
   attachmentUrl?: string | null
   read_at?: string | null
-  isPending?: boolean
+  /** Optimistic-only delivery state. Confirmed rows leave this unset. */
+  status?: 'pending' | 'failed'
+  /** Idempotency key for optimistic rows; absent on confirmed rows. */
+  clientMessageId?: string
 }
 
 interface ThreadViewProps {
@@ -71,6 +179,11 @@ interface ThreadViewProps {
   embedded?: boolean
 }
 
+/**
+ * W-06 — mint the raw client idempotency key (a bare UUID, no prefix). The
+ * placeholder bubble id is derived separately via `optimisticMessageId`, and
+ * sends/retries always pass the raw key so the server echo can be correlated.
+ */
 function newClientMessageId(): string {
   if (
     typeof crypto !== 'undefined' &&
@@ -78,12 +191,56 @@ function newClientMessageId(): string {
   ) {
     return crypto.randomUUID()
   }
-  return `optimistic-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`
+  return `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`
 }
 
 function attachmentCaption(draft: ComposerSendDraft): string {
   if (draft.text.trim().length > 0) return draft.text.trim()
   return draft.attachmentName ?? 'Attachment'
+}
+
+/** L-01 — pulse bubble rows shown while the thread query is loading. */
+function MessageSkeletonRows() {
+  return (
+    <div
+      aria-hidden="true"
+      className="flex min-h-0 flex-1 flex-col justify-start gap-2 overflow-hidden px-4 py-5"
+    >
+      {Array.from({ length: 5 }, (_, index) => (
+        <div
+          key={index}
+          className={cn(
+            'flex w-full animate-pulse items-end',
+            index % 2 === 1 ? 'justify-end' : 'justify-start',
+          )}
+        >
+          <div
+            className={cn(
+              'h-10 w-2/3 rounded-2xl bg-[var(--cx-surface-3)]',
+              index % 2 === 1 ? 'rounded-br-md' : 'rounded-tl-md',
+            )}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * IO-05 — server chat actions return `{ ok: false, error }` on failure instead
+ * of throwing. This mirrors `client/api/chat.ts`'s `unwrap` helper verbatim so
+ * M-04's load-earlier path can ride the action boundary (the client page
+ * helper `fetchMessagesPage` has not landed yet) with the same throwing
+ * semantics the chat UI try/catches rely on.
+ */
+async function unwrapMessagesPage<T>(
+  p: Promise<T | { ok: false; error: string }>,
+): Promise<T> {
+  const r = await p
+  if (r && typeof r === 'object' && 'ok' in r && r.ok === false) {
+    throw new Error(r.error)
+  }
+  return r as T
 }
 
 /**
@@ -208,42 +365,181 @@ export function ThreadView({
   peer,
   embedded = false,
 }: ThreadViewProps) {
-  const connectionState = useChatConnection(matchId, { myId })
   const { polite: announce } = useLiveRegion()
-  const [threadKey] = useState(() => keys.messages(matchId).join('/'))
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
+  const threadKey = keys.messages(matchId).join('/')
   const { data, isLoading, error, refetch } = useQuery(threadKey, () =>
     watchMessages({ matchId, limit: 50 }),
   )
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [pending, setPending] = useState<ThreadMessage[]>([])
+  const [realtimeAppended, setRealtimeAppended] = useState<ThreadMessage[]>([])
+  const [earlierMessages, setEarlierMessages] = useState<ThreadMessage[]>([])
+  const [hasEarlier, setHasEarlier] = useState(false)
+  const [loadingEarlier, setLoadingEarlier] = useState(false)
+  const cursorRef = useRef<string | null>(null)
   const [reactionsData, setReactionsData] = useState<ReactionRecord[]>([])
+  /** I-02/onReceipt — local `read_at` patches (double-check ticks) pre-refetch. */
+  const [readAtOverrides, setReadAtOverrides] = useState<Record<string, string>>(
+    {},
+  )
   const bottomRef = useRef<HTMLDivElement>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTypingPublishRef = useRef(0)
+  const [nearBottom, setNearBottom] = useState(true)
+  const seenInboundRef = useRef<Set<string>>(new Set())
+  const lastInboundIdsRef = useRef<Set<string>>(new Set())
+  const [newMessagesSinceScroll, setNewMessagesSinceScroll] = useState(0)
+  const serverMessagesRef = useRef<ThreadMessage[]>([])
+  const allConfirmedRef = useRef<ThreadMessage[]>([])
 
   // Thread search states
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [activeSearchIndex, setActiveSearchIndex] = useState(0)
 
+  const refetchRef = useRef(refetch)
   useEffect(() => {
-    void markConversationRead(matchId).catch(() => undefined)
-  }, [matchId])
+    refetchRef.current = refetch
+  })
 
-  const serverMessages: ThreadMessage[] = (data ?? []).map((m) => ({
+  // Realtime identity/mappers (canonical contract in lib/chat/realtime.ts).
+  // The local thread row carries the same data as `MessagePayload` under the
+  // legacy snake_case field names, so the adapter bridges once. The rows
+  // `mergeRealtimeMessage` returns are the originals (it only inserts + sorts,
+  // never projects through `toPayload`), so the casts are identity-preserving.
+  const threadMessageToPayload = (m: ThreadMessage): MessagePayload => ({
+    matchId,
     id: m.id,
+    senderId: m.sender_id,
     content: m.content,
-    created_at: m.created_at,
-    sender_id: m.sender_id,
-    attachmentUrl: m.attachment_url ?? null,
-    read_at: m.read_at ?? null,
-  }))
-  const confirmedIds = new Set(serverMessages.map((m) => m.id))
-  const visible = [
-    ...serverMessages,
-    ...pending.filter((p) => !confirmedIds.has(p.id)),
-  ]
+    createdAt: m.created_at,
+    ...(m.clientMessageId ? { clientMessageId: m.clientMessageId } : {}),
+  })
+
+  const mergeIncomingThreadMessage = (
+    current: readonly ThreadMessage[],
+    incoming: ThreadMessage,
+  ): ThreadMessage[] =>
+    mergeRealtimeMessage(
+      current as unknown as readonly MessagePayload[],
+      incoming as unknown as MessagePayload,
+      threadMessageToPayload as unknown as (
+        message: MessagePayload,
+      ) => MessagePayload,
+    ) as unknown as ThreadMessage[]
+
+  function realtimeToThread(payload: MessagePayload): ThreadMessage {
+    return {
+      id: payload.id,
+      content: payload.content,
+      created_at: payload.createdAt,
+      sender_id: payload.senderId,
+      attachmentUrl: null,
+      ...(payload.clientMessageId
+        ? { clientMessageId: payload.clientMessageId }
+        : {}),
+    }
+  }
+
+  // Realtime delivery accelerators (P1). Peer messages/reactions/receipts
+  // converge instantly instead of waiting for the 10s poll.
+  const handleRealtimeMessage = (payload: MessagePayload) => {
+    // The connection hook already drops own echoes (actorId === myId); guard
+    // again defensively so a local echo can never double-append.
+    if (payload.senderId === myId) return
+    setRealtimeAppended((prev) => {
+      if (prev.some((p) => p.id === payload.id)) return prev
+      if (allConfirmedRef.current.some((m) => m.id === payload.id)) return prev
+      return [...prev, realtimeToThread(payload)]
+    })
+    // Reconcile the authoritative page (fills attachments/read_at the realtime
+    // envelope does not carry). The overlay survives overwrites until the
+    // server row is actually present, so the merged bubble never flickers.
+    void refetch().catch(() => undefined)
+  }
+
+  const handleRealtimeReaction = (payload: ReactionPayload) => {
+    if (!isMessageReaction(payload.emoji)) return
+    // Narrow outside the updater callback — narrower scopes don't carry the
+    // type-guard narrowing on `payload.emoji` into the closure.
+    const emoji: MessageReaction = payload.emoji
+    setReactionsData((prev) =>
+      applyReactionToggle(prev, {
+        messageId: payload.messageId,
+        userId: payload.userId,
+        emoji,
+        active: payload.active,
+      }),
+    )
+  }
+
+  const handleRealtimeReceipt = (payload: ReceiptPayload) => {
+    if (payload.readerId === myId) return
+    const confirmed = serverMessagesRef.current
+    setReadAtOverrides((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const message of confirmed) {
+        if (message.sender_id !== myId) continue
+        // Only recency-bounded receipts and never clobber an authoritative
+        // `read_at` already returned by the server.
+        if (message.read_at) continue
+        if (message.created_at > payload.readAt) continue
+        if (next[message.id] === payload.readAt) continue
+        next[message.id] = payload.readAt
+        changed = true
+      }
+      return changed ? next : prev
+    })
+  }
+
+  const handleRealtimeReconnect = () => {
+    void refetch().catch(() => undefined)
+  }
+
+  const { isPeerTyping, sendTyping } = useChatConnection(matchId, {
+    myId,
+    onMessage: handleRealtimeMessage,
+    onReaction: handleRealtimeReaction,
+    onReceipt: handleRealtimeReceipt,
+    onReconnect: handleRealtimeReconnect,
+  })
+
+  const rawServerMessages: ThreadMessage[] = (data ?? []).map(
+    mapSummaryToThread,
+  )
+  const serverMessages = rawServerMessages.map((m) => {
+    const override = readAtOverrides[m.id]
+    return override && !m.read_at ? { ...m, read_at: override } : m
+  })
+  const allConfirmed: ThreadMessage[] = [...earlierMessages, ...serverMessages]
+
+  // Keep the realtime handlers' read snapshots aligned with the latest render.
+  // Same idiom as `message-list.tsx` replaying `onNearBottomChange` through a
+  // ref — run after every render, never during it.
+  useEffect(() => {
+    serverMessagesRef.current = serverMessages
+    allConfirmedRef.current = allConfirmed
+  })
+
+  // W-06/M-03 — the confirmed+optimistic rows with realtime overlays merged
+  // through the canonical merge helper (correlates `optimistic-` placeholders
+  // against their server echo and drops duplicates).
+  const mergedConfirmed = realtimeAppended.reduce(
+    (acc, message) => mergeIncomingThreadMessage(acc, message),
+    [...allConfirmed, ...pending],
+  )
+  const visible: ThreadMessage[] = []
+  {
+    const seen = new Set<string>()
+    for (const message of mergedConfirmed) {
+      if (seen.has(message.id)) continue
+      seen.add(message.id)
+      visible.push(message)
+    }
+  }
 
   const matchingIds = visible
     .filter((m) =>
@@ -264,10 +560,13 @@ export function ThreadView({
     }
   }, [activeMatchId, searchQuery])
 
+  const visibleIdKey = visible.map((m) => m.id).join(',')
+
   useEffect(() => {
     const messageIds = visible
+      .filter((m) => !m.id.startsWith('optimistic-'))
       .map((m) => m.id)
-      .filter((id) => !id.startsWith('optimistic-'))
+      .slice(0, 100)
     if (messageIds.length === 0) return
     let active = true
     void getChatReactions(matchId, messageIds)
@@ -278,7 +577,10 @@ export function ThreadView({
     return () => {
       active = false
     }
-  }, [matchId, visible.length])
+    // Keyed on the ordered message-id string so peer reactions can ride
+    // `onReaction` without waiting for a deps-keyed refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId, visibleIdKey])
 
   const messageReactionsMap = groupReactionsByMessage(reactionsData, myId)
 
@@ -313,30 +615,251 @@ export function ThreadView({
   }
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }
-  }, [visible.length, connectionState.isPeerTyping, searchQuery])
+    if (searchQuery.trim() || !nearBottom) return
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [visible.length, isPeerTyping, searchQuery, nearBottom])
 
+  // Poll — reconciles the authoritative page every 10s regardless of a
+  // transient refetch error, so an M-03 optimistic bubble that survived a
+  // failed `refetch()` is reconciled by the very next poll.
   useEffect(() => {
-    if (error) return
     const timer = setInterval(() => {
-      void refetch().catch(() => undefined)
+      void refetchRef.current().catch(() => undefined)
     }, 10000)
     return () => clearInterval(timer)
-  }, [error, refetch])
+  }, [matchId])
 
+  // M-03 — never drop a pending bubble early. Once the refetched data carries
+  // a confirmed row for the same (sender, content, attachment) inside the
+  // clock-tolerance window, one-to-one match removes the placeholder. A
+  // bubble whose row is still absent stays `pending` and reconciles on the
+  // next poll; `failed` rows are only removed by an explicit retry.
+  useEffect(() => {
+    // Reconcile the optimistic placeholder against the authoritative `data`
+    // page only after it lands; a render-time prune cannot observe post-fetch
+    // state, and this effect is deliberately keyed on the query result.
+    // Steered around `set-state-in-effect`: the transition is data-driven.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPending((prev) => {
+      if (prev.length === 0) return prev
+      const rows = (data ?? [])
+        .map(mapSummaryToThread)
+        .filter((r) => r.sender_id === myId && !r.id.startsWith('optimistic-'))
+      if (rows.length === 0) return prev
+      const keepFailed = prev.filter((p) => p.status === 'failed')
+      const active = prev.filter((p) => p.status !== 'failed')
+      if (active.length === 0) return prev
+
+      const isConfirmedByRow = (p: ThreadMessage, row: ThreadMessage): boolean =>
+        p.sender_id === row.sender_id &&
+        p.content === row.content &&
+        (p.attachmentUrl ?? null) === (row.attachmentUrl ?? null) &&
+        (() => {
+          const a = new Date(p.created_at).getTime()
+          const b = new Date(row.created_at).getTime()
+          if (Number.isNaN(a) || Number.isNaN(b)) return false
+          return Math.abs(a - b) <= PENDING_CONFIRM_TOLERANCE_MS
+        })()
+
+      const matched = new Set<string>()
+      for (const row of rows) {
+        const target = active.find(
+          (p) => !matched.has(p.id) && isConfirmedByRow(p, row),
+        )
+        if (target) matched.add(target.id)
+      }
+      if (matched.size === 0) return prev
+      const next = [...keepFailed, ...active.filter((p) => !matched.has(p.id))]
+      const orderIndex = new Map(prev.map((p, index) => [p.id, index]))
+      next.sort(
+        (a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0),
+      )
+      return next
+    })
+  }, [data, myId])
+
+  // Prune realtime overlays once their authoritative row appears in the
+  // confirmed pages (server data or a loaded-earlier page).
+  useEffect(() => {
+    // Drop realtime overlays only once their authoritative row is on the
+    // confirmed pages; a render-time prune would race the just-landed
+    // `data`/`earlierMessages` fetch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRealtimeAppended((prev) => {
+      if (prev.length === 0) return prev
+      const known = new Set<string>()
+      for (const m of earlierMessages) known.add(m.id)
+      for (const m of data ?? []) known.add(m.id)
+      const next = prev.filter((p) => !known.has(p.id))
+      return next.length === prev.length ? prev : next
+    })
+  }, [data, earlierMessages])
+
+  // Drop local read receipts that the server has now made authoritative (or
+  // whose message no longer exists).
+  useEffect(() => {
+    // Prune local receipt patches once the refetched page carries the
+    // authoritative `read_at` (or the message no longer exists).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReadAtOverrides((prev) => {
+      const ids = Object.keys(prev)
+      if (ids.length === 0) return prev
+      const rows = data ?? []
+      let changed = false
+      const next: Record<string, string> = {}
+      for (const id of ids) {
+        const row = rows.find((m) => m.id === id)
+        if (!row || row.read_at) {
+          changed = true
+          continue
+        }
+        next[id] = prev[id]
+      }
+      return changed ? next : prev
+    })
+  }, [data])
+
+  // I-02 — re-mark the conversation read whenever freshly-seen inbound
+  // messages appear while the viewer is reading at the bottom, then keep the
+  // inbox unread badge converged with a refresh event.
+  const inboundIdsKey = visible
+    .filter((m) => m.sender_id !== myId && !m.id.startsWith('optimistic-'))
+    .map((m) => m.id)
+    .join(',')
+
+  useEffect(() => {
+    const freshIds: string[] = []
+    if (inboundIdsKey) {
+      for (const id of inboundIdsKey.split(',')) {
+        if (!seenInboundRef.current.has(id)) freshIds.push(id)
+      }
+    }
+    if (freshIds.length === 0) return
+    if (!nearBottom) return
+    for (const id of freshIds) seenInboundRef.current.add(id)
+    void markConversationRead(matchId)
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('chat:inbox-refresh'))
+      })
+      .catch(() => undefined)
+  }, [matchId, inboundIdsKey, nearBottom])
+
+  // M-09 — count inbound messages that land while the viewer is scrolled up;
+  // the message-list FAB surfaces them and reset happens on scroll-to-bottom.
+  useEffect(() => {
+    const nextIds = new Set<string>()
+    if (inboundIdsKey) {
+      for (const id of inboundIdsKey.split(',')) nextIds.add(id)
+    }
+    if (nearBottom) {
+      lastInboundIdsRef.current = nextIds
+      // Reset the count whenever the snapshot flips to the bottom of the
+      // scroll container; a render-time expression could not see it either.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNewMessagesSinceScroll(0)
+      return
+    }
+    let added = 0
+    for (const id of nextIds) {
+      if (!lastInboundIdsRef.current.has(id)) added += 1
+    }
+    lastInboundIdsRef.current = nextIds
+    if (added > 0) {
+      setNewMessagesSinceScroll((count) => count + added)
+    }
+  }, [inboundIdsKey, nearBottom])
+
+  const handleScrollToBottom = () => {
+    setNewMessagesSinceScroll(0)
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    })
+  }
+
+  // M-04 — load older pages. `client/api/chat.ts` does not yet export
+  // `fetchMessagesPage` at this revision, so load-earlier rides on the
+  // `getMessagesAction` adapter (which preserves the server page contract
+  // `{ messages, nextCursor }` until the other agent lands the page helper).
+  useEffect(() => {
+    cursorRef.current = null
+    let active = true
+    void unwrapMessagesPage(getMessagesAction({ matchId, limit: 50 }))
+      .then((page) => {
+        if (!active) return
+        cursorRef.current = page.nextCursor ?? null
+        setHasEarlier(page.nextCursor != null)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [matchId])
+
+  async function handleLoadEarlier() {
+    if (loadingEarlier) return
+    const cursor = cursorRef.current
+    setLoadingEarlier(true)
+    try {
+      const page = await unwrapMessagesPage(
+      getMessagesAction({
+        matchId,
+        limit: 50,
+        ...(cursor ? { cursor } : {}),
+      }),
+    )
+      setEarlierMessages((prev) => [
+        ...page.messages.map(serviceMessageToThread),
+        ...prev,
+      ])
+      cursorRef.current = page.nextCursor ?? null
+      setHasEarlier(page.nextCursor != null)
+    } catch {
+      announce('Earlier messages could not be loaded.')
+    } finally {
+      setLoadingEarlier(false)
+    }
+  }
+
+  // Reset per-thread local state when the embedded panel switches matches.
+  useEffect(() => {
+    // The embedded panel swaps conversations via `matchId`; its whole derived
+    // local state must reset in one step rather than re-derive mid-swap.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPending([])
+    setRealtimeAppended([])
+    setEarlierMessages([])
+    setHasEarlier(false)
+    setLoadingEarlier(false)
+    cursorRef.current = null
+    setReactionsData([])
+    setReadAtOverrides({})
+    setNewMessagesSinceScroll(0)
+    setNearBottom(true)
+    seenInboundRef.current = new Set()
+    lastInboundIdsRef.current = new Set()
+    lastTypingPublishRef.current = 0
+    setSearchQuery('')
+    setSearchOpen(false)
+    setActiveSearchIndex(0)
+  }, [matchId])
+
+  // µ-04 — throttle `sendTyping(true)` to ~1/s during continuous typing,
+  // always flushing a trailing `false` on stop (existing timer preserved).
   const handleDraftChange = (text: string) => {
-    if (!connectionState.sendTyping) return
+    if (!sendTyping) return
     if (text.length > 0) {
-      connectionState.sendTyping(true)
+      const now = Date.now()
+      if (now - lastTypingPublishRef.current >= TYPING_PUBLISH_INTERVAL_MS) {
+        lastTypingPublishRef.current = now
+        sendTyping(true)
+      }
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
       typingTimerRef.current = setTimeout(() => {
-        connectionState.sendTyping?.(false)
+        sendTyping?.(false)
       }, 2500)
     } else {
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
-      connectionState.sendTyping(false)
+      sendTyping(false)
     }
   }
 
@@ -361,19 +884,23 @@ export function ThreadView({
     }
   }
 
-  async function handleSend(draft: ComposerSendDraft) {
-    if (sending) return
+  async function handleSend(draft: ComposerSendDraft): Promise<boolean> {
+    if (sending) return false
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
-    connectionState.sendTyping?.(false)
+    sendTyping?.(false)
+    lastTypingPublishRef.current = 0
     const content = attachmentCaption(draft)
     setSending(true)
     setSendError(null)
+    const clientMessageId = newClientMessageId()
     const optimistic: ThreadMessage = {
-      id: newClientMessageId(),
+      id: optimisticMessageId(clientMessageId),
+      clientMessageId,
       content,
       created_at: new Date().toISOString(),
       sender_id: myId,
-      isPending: true,
+      attachmentUrl: draft.attachmentUrl ?? null,
+      status: 'pending',
     }
     setPending((prev) => [...prev, optimistic])
     requestAnimationFrame(() => {
@@ -383,14 +910,67 @@ export function ThreadView({
       await sendChatMessage({
         matchId,
         content,
-        clientMessageId: optimistic.id,
+        clientMessageId,
         ...(draft.attachmentUrl ? { attachmentUrl: draft.attachmentUrl } : {}),
       })
-      setPending((prev) => prev.filter((p) => p.id !== optimistic.id))
+      // M-03 — keep the placeholder (no pre-refetch removal): it stays
+      // `pending` until the reconciled page confirms the persisted row, so
+      // the send never flickers into an unconfirmed gap.
       await refetch()
       announce('Message sent')
+      window.dispatchEvent(new CustomEvent('chat:inbox-refresh'))
+      return true
     } catch {
-      setPending((prev) => prev.filter((p) => p.id !== optimistic.id))
+      // Keep the bubble so the user's text survives; it flips to the failed
+      // state and gains a retry affordance wired to `handleRetryMessage`.
+      setPending((prev) =>
+        prev.map((p) =>
+          p.id === optimistic.id ? { ...p, status: 'failed' } : p,
+        ),
+      )
+      setSendError('Message could not be sent. Please try again.')
+      announce('Message could not be sent. Please try again.')
+      return false
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function handleRetryMessage(messageId: string) {
+    if (sending) return
+    const failed = pending.find((p) => p.id === messageId)
+    if (!failed) return
+    setSending(true)
+    setSendError(null)
+    setPending((prev) =>
+      prev.map((p) =>
+        p.id === messageId ? { ...p, status: 'pending' } : p,
+      ),
+    )
+    try {
+      const clientMessageId =
+        failed.clientMessageId ??
+        extractClientMessageId(failed.id) ??
+        newClientMessageId()
+      await sendChatMessage({
+        matchId,
+        content: failed.content,
+        clientMessageId,
+        ...(failed.attachmentUrl
+          ? { attachmentUrl: failed.attachmentUrl }
+          : {}),
+      })
+      // M-03 — the retried bubble stays `pending` until the reconcile
+      // confirms the persisted row (same idempotency key, no double-write).
+      await refetch()
+      announce('Message sent')
+      window.dispatchEvent(new CustomEvent('chat:inbox-refresh'))
+    } catch {
+      setPending((prev) =>
+        prev.map((p) =>
+          p.id === messageId ? { ...p, status: 'failed' } : p,
+        ),
+      )
       setSendError('Message could not be sent. Please try again.')
       announce('Message could not be sent. Please try again.')
     } finally {
@@ -398,36 +978,45 @@ export function ThreadView({
     }
   }
 
-  const messagesToRender = visible
-
-  const chatMessages: ChatMessage[] = messagesToRender.map((m) => {
-    const isSent = m.sender_id === myId
-    let status: 'sent' | 'read' | 'pending' | undefined = undefined
-    if (isSent) {
-      if (m.isPending) {
-        status = 'pending'
-      } else if (m.read_at) {
-        status = 'read'
-      } else {
-        status = 'sent'
+  const groupedByDay = groupThreadMessagesByDay(visible)
+  const chatMessageGroups: ChatMessage[][] = groupedByDay.groups.map((group) =>
+    group.map((m) => {
+      const isSent = m.sender_id === myId
+      let status: 'sent' | 'read' | 'pending' | 'failed' | undefined = undefined
+      if (isSent) {
+        if (m.status === 'failed') {
+          status = 'failed'
+        } else if (m.status === 'pending') {
+          status = 'pending'
+        } else if (m.read_at) {
+          status = 'read'
+        } else {
+          status = 'sent'
+        }
       }
-    }
 
-    return {
-      id: m.id,
-      text: m.content,
-      sent: isSent,
-      time: formatRelativeDate(m.created_at),
-      status,
-      attachmentUrl: m.attachmentUrl,
-      attachmentName: m.attachmentUrl
-        ? m.attachmentUrl.split('/').pop() ?? 'Attachment'
-        : null,
-      reactions: messageReactionsMap[m.id] ?? [],
-      searchQuery: searchQuery.trim() || undefined,
-      isActiveSearchMatch: m.id === activeMatchId,
-    }
-  })
+      return {
+        id: m.id,
+        text: m.content,
+        sent: isSent,
+        // M-08 — absolute clock time, not relative.
+        time: clockTimeFormatter.format(new Date(m.created_at)),
+        status,
+        attachmentUrl: m.attachmentUrl,
+        attachmentName: m.attachmentUrl
+          ? m.attachmentUrl.split('/').pop() ?? 'Attachment'
+          : null,
+        reactions: messageReactionsMap[m.id] ?? [],
+        searchQuery: searchQuery.trim() || undefined,
+        isActiveSearchMatch: m.id === activeMatchId,
+      }
+    }),
+  )
+  const groupLabels: (string | undefined)[] = groupedByDay.labels
+  const chatMessageCount = chatMessageGroups.reduce(
+    (count, group) => count + group.length,
+    0,
+  )
 
   const renderSearchBar = () => (
     <>
@@ -516,28 +1105,48 @@ export function ThreadView({
   )
 
   const body = isLoading ? (
-    <LoadingState label="Loading conversation…" />
+    <MessageSkeletonRows />
   ) : error ? (
     <ErrorState onRetry={() => void refetch()} />
   ) : (
     <>
-      <div aria-live="polite" className="flex flex-1 flex-col gap-2">
-        {chatMessages.length === 0 && !connectionState.isPeerTyping ? (
-          <p className="py-10 text-center text-sm text-[var(--cx-text-3)]">
-            No messages yet. Say hello to start the conversation.
-          </p>
-        ) : (
-          <MessageList
-            messages={[chatMessages]}
-            isPeerTyping={connectionState.isPeerTyping}
-            peerName={peer?.fullName}
-            endRef={bottomRef}
-            onToggleReaction={handleToggleReaction}
-            searchQuery={searchQuery.trim() || undefined}
-            activeMessageId={activeMatchId ?? undefined}
-          />
-        )}
-      </div>
+      {hasEarlier ? (
+        <div className="flex justify-center py-3">
+          <button
+            type="button"
+            onClick={() => void handleLoadEarlier()}
+            disabled={loadingEarlier}
+            className="flex items-center gap-1.5 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-3 py-1 text-[11px] font-medium text-[var(--cx-text-3)] transition hover:border-[var(--cx-border-2)] hover:text-[var(--cx-text-1)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadingEarlier ? (
+              <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+            ) : null}
+            {loadingEarlier ? 'Loading earlier messages…' : 'Load earlier messages'}
+          </button>
+        </div>
+      ) : null}
+
+      {chatMessageCount === 0 && !isPeerTyping ? (
+        <p className="py-10 text-center text-sm text-[var(--cx-text-3)]">
+          No messages yet. Say hello to start the conversation.
+        </p>
+      ) : (
+        <MessageList
+          messages={chatMessageGroups}
+          groupLabels={groupLabels}
+          isPeerTyping={isPeerTyping}
+          peerName={peer?.fullName}
+          endRef={bottomRef}
+          onToggleReaction={handleToggleReaction}
+          onRetryMessage={handleRetryMessage}
+          onNearBottomChange={setNearBottom}
+          searchQuery={searchQuery.trim() || undefined}
+          activeMessageId={activeMatchId ?? undefined}
+          newMessagesCount={newMessagesSinceScroll}
+          onScrollToBottom={handleScrollToBottom}
+          className="min-h-0 flex-1"
+        />
+      )}
 
       {sendError ? (
         <p role="alert" className="mt-3 text-xs text-[var(--cx-danger)]">
@@ -546,11 +1155,10 @@ export function ThreadView({
       ) : null}
 
       <MessageComposer
-        variant="composer"
-        connectionState={connectionState.state}
         sending={sending}
         matchId={matchId}
         autoFocus
+        peerName={peer?.fullName}
         onSend={handleSend}
         onError={setSendError}
         onDraftChange={handleDraftChange}
@@ -565,8 +1173,75 @@ export function ThreadView({
 
   if (embedded) {
     return (
-      <div className="flex min-h-[440px] w-full flex-col">
-        <div className="mb-2 flex justify-end px-2">{renderSearchBar()}</div>
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+        <header className="border-b border-[var(--cx-border-1)] px-3 pb-2.5 pt-3 sm:px-4">
+          <div className="flex items-center gap-3">
+            {peer.fullName ? (
+              <button
+                type="button"
+                onClick={() => void handleOpenPeerProfile()}
+                title={
+                  peer.fullName
+                    ? `View ${peer.fullName}'s profile`
+                    : undefined
+                }
+                className="shrink-0 rounded-full transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--cx-brand)]"
+              >
+                {peer.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={peer.avatarUrl}
+                    alt={peer.fullName}
+                    className="size-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="flex size-10 items-center justify-center rounded-full bg-[var(--cx-brand-soft)] text-xs font-semibold text-[var(--cx-brand-strong)]">
+                    {peer.fullName.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+              </button>
+            ) : (
+              // L-04 — pulse circle while the peer profile is still resolving.
+              <div
+                aria-hidden="true"
+                className="size-10 shrink-0 animate-pulse rounded-full bg-[var(--cx-surface-3)]"
+              />
+            )}
+            <div className="min-w-0 flex-1 leading-tight">
+              {peer.fullName ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold">
+                      {peer.fullName}
+                    </p>
+                    <span className="shrink-0 rounded-full border border-[var(--cx-border-2)] bg-[var(--cx-surface-2)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--cx-text-3)]">
+                      Direct
+                    </span>
+                  </div>
+                  {peer.role ? (
+                    <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-[var(--cx-text-3)]">
+                      <span
+                        aria-hidden="true"
+                        className="size-1.5 shrink-0 rounded-full bg-[var(--cx-success)]"
+                      />
+                      {peer.role}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                // L-04 — pulse text until the peer name resolves.
+                <div
+                  aria-hidden="true"
+                  className="animate-pulse space-y-2 py-0.5"
+                >
+                  <div className="h-3.5 w-28 rounded bg-[var(--cx-surface-3)]" />
+                  <div className="h-2.5 w-16 rounded bg-[var(--cx-surface-3)]" />
+                </div>
+              )}
+            </div>
+            {renderSearchBar()}
+          </div>
+        </header>
         {body}
         {profileUserId ? (
           <MemberProfileDialog
@@ -626,10 +1301,7 @@ export function ThreadView({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            {renderSearchBar()}
-            <MessageComposer connectionState={connectionState.state} />
-          </div>
+          <div className="flex items-center gap-2 sm:gap-3">{renderSearchBar()}</div>
         </div>
       </header>
 
@@ -653,4 +1325,3 @@ export function ThreadView({
     </main>
   )
 }
-

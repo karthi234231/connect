@@ -1,13 +1,23 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Code, FileCode, FileText, Paperclip, Send, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  Code,
+  FileCode,
+  FileText,
+  Loader2,
+  Paperclip,
+  Send,
+  X,
+} from 'lucide-react'
 import { cn } from '@/utils/cn'
 import {
   ALLOWED_ATTACHMENT_MIME,
+  formatFileSize,
   validateAttachmentFile,
 } from '@/lib/chat/attachment'
 import {
+  buildComposerPlaceholder,
   canSubmitDraft,
   cleanComposerText,
   COMPOSER_MAX_CHARS,
@@ -21,8 +31,7 @@ import {
   createChatAttachmentUpload,
   uploadChatAttachment,
 } from '@/client/api/chat'
-
-export type ComposerConnectionState = 'connecting' | 'reconnecting' | 'online'
+import { useAttachmentSignedUrl } from '@/hooks/use-attachment-urls'
 
 export interface ComposerSendDraft {
   text: string
@@ -30,48 +39,52 @@ export interface ComposerSendDraft {
   attachmentName?: string
 }
 
+/** Above this many rows the composer stops growing and scrolls instead. */
+const MAX_COMPOSER_ROWS = 6
+
+/** Remaining-characters counter becomes visible once this close to the cap. */
+const CHARS_CAP_THRESHOLD = 80
+
 interface MessageComposerProps {
-  /**
-   * `pill` keeps the legacy connection-status badge (headers, default so
-   * existing callers are untouched); `composer` renders the real message
-   * input with send-on-enter + attachments.
-   */
-  variant?: 'pill' | 'composer'
-  connectionState?: ComposerConnectionState
   className?: string
-  /** Composer mode only — offline/locked threads disable the input. */
+  /** Offline/locked threads disable the input. */
   disabled?: boolean
-  /** Composer mode only — an in-flight send disables the affordance. */
+  /** An in-flight send disables the affordance. */
   sending?: boolean
   placeholder?: string
+  /** First name for the personalized "Message …" placeholder. */
+  peerName?: string
   autoFocus?: boolean
   /** Required for the attachment upload flow (createAttachmentUpload). */
   matchId?: string
-  onSend?: (draft: ComposerSendDraft) => void | Promise<void>
+  /** Resolves with `false` when the send failed — the composer then keeps the
+   * draft + attachment instead of clearing them (retry is a real affordance). */
+  onSend?: (draft: ComposerSendDraft) => void | Promise<boolean> | Promise<void>
   onError?: (message: string) => void
-  /** Composer mode only — fired with the raw draft on every keystroke. */
+  /** Fired with the raw draft on every keystroke. */
   onDraftChange?: (text: string) => void
 }
 
-const STATUS_LABEL: Record<ComposerConnectionState, string> = {
-  online: 'Online',
-  reconnecting: 'Reconnecting\u2026',
-  connecting: 'Connecting\u2026',
+function isImageAttachment(name: string): boolean {
+  return /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(name)
 }
 
-const STATUS_DOT: Record<ComposerConnectionState, string> = {
-  online: 'bg-[var(--cx-success)]',
-  reconnecting: 'bg-[var(--cx-warning)]',
-  connecting: 'bg-[var(--cx-text-4)]',
+/** Cap the composer's height at ~`MAX_COMPOSER_ROWS` rows of its own line-height. */
+function computeMaxComposerHeight(el: HTMLTextAreaElement): number {
+  const style = window.getComputedStyle(el)
+  const lineHeight =
+    style.lineHeight === 'normal'
+      ? parseFloat(style.fontSize) * 1.4
+      : parseFloat(style.lineHeight)
+  return Math.round(lineHeight * MAX_COMPOSER_ROWS)
 }
 
 export function MessageComposer({
-  variant = 'pill',
-  connectionState = 'connecting',
   className,
   disabled = false,
   sending = false,
   placeholder,
+  peerName,
   autoFocus = false,
   matchId,
   onSend,
@@ -82,31 +95,63 @@ export function MessageComposer({
   const [attachment, setAttachment] = useState<{
     url: string
     name: string
+    size: number
   } | null>(null)
   const [attaching, setAttaching] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const textInputRef = useRef<HTMLInputElement>(null)
+  const textAreaRef = useRef<HTMLTextAreaElement>(null)
+
+  // The image preview must never render the storage PATH directly (always
+  // 404s) — resolve it through the signed-URL pipeline before `<img src>`.
+  const isImage = attachment != null && isImageAttachment(attachment.name)
+  const previewUrl = useAttachmentSignedUrl(
+    isImage ? attachment?.url : null,
+  )
+
+  // Auto-grow: pin the height to the content, capped at MAX_COMPOSER_ROWS.
+  const resizeTextarea = useCallback(() => {
+    const el = textAreaRef.current
+    if (!el) return
+    const maxHeight = computeMaxComposerHeight(el)
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [])
 
   useEffect(() => {
-    if (variant === 'composer' && autoFocus && !disabled) {
-      textInputRef.current?.focus()
-    }
-  }, [variant, autoFocus, disabled, matchId])
+    resizeTextarea()
+  }, [draft, resizeTextarea])
 
-  if (variant !== 'composer') {
-    return (
-      <div
-        className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-2.5 py-1 ${className ?? ''}`}
-      >
-        <span
-          aria-hidden="true"
-          className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[connectionState]}`}
-        />
-        <span className="text-[10px] font-medium tracking-wide text-[var(--cx-text-3)]">
-          {STATUS_LABEL[connectionState]}
-        </span>
-      </div>
-    )
+  useEffect(() => {
+    window.addEventListener('resize', resizeTextarea)
+    return () => window.removeEventListener('resize', resizeTextarea)
+  }, [resizeTextarea])
+
+  useEffect(() => {
+    if (autoFocus && !disabled) {
+      textAreaRef.current?.focus()
+    }
+  }, [autoFocus, disabled, matchId])
+
+  async function performSend() {
+    if (disabled || sending) return
+    const text = cleanComposerText(draft)
+    if (!canSubmitDraft(text, Boolean(attachment))) return
+    const ok = await onSend?.({
+      text,
+      ...(attachment
+        ? { attachmentUrl: attachment.url, attachmentName: attachment.name }
+        : {}),
+    })
+    // A failed send resolves `false` — keep the draft so the user can retry
+    // (the failed bubble's retry affordance resends with the same text).
+    if (ok === false) return
+    setDraft('')
+    setAttachment(null)
+    onDraftChange?.('')
+    setTimeout(() => {
+      textAreaRef.current?.focus()
+    }, 0)
   }
 
   async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
@@ -124,7 +169,7 @@ export function MessageComposer({
     try {
       const upload = await createChatAttachmentUpload(matchId, file)
       await uploadChatAttachment(file, upload.signedUrl)
-      setAttachment({ url: upload.path, name: file.name })
+      setAttachment({ url: upload.path, name: file.name, size: file.size })
     } catch {
       onError?.('Attachment could not be uploaded. Please try again.')
     } finally {
@@ -132,22 +177,17 @@ export function MessageComposer({
     }
   }
 
-  async function handleSubmit(event: React.FormEvent) {
+  function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    if (disabled || sending) return
-    const text = cleanComposerText(draft)
-    if (!canSubmitDraft(text, Boolean(attachment))) return
-    await onSend?.({
-      text,
-      ...(attachment
-        ? { attachmentUrl: attachment.url, attachmentName: attachment.name }
-        : {}),
-    })
-    setDraft('')
-    setAttachment(null)
-    setTimeout(() => {
-      textInputRef.current?.focus()
-    }, 0)
+    void performSend()
+  }
+
+  function handleComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || event.shiftKey) return
+    // Leave IME composition Enter keys untouched (Enter confirms the candidate).
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
+    event.preventDefault()
+    void performSend()
   }
 
   const submitReady = canSubmitDraft(
@@ -155,8 +195,8 @@ export function MessageComposer({
     Boolean(attachment),
   )
 
-  const isImageAttachment = (name: string) =>
-    /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(name)
+  const remainingChars = COMPOSER_MAX_CHARS - draft.length
+  const nearCharsCap = remainingChars <= CHARS_CAP_THRESHOLD
 
   const detectedCodeSnippet = extractCodeSnippetDraft(draft)
 
@@ -171,7 +211,7 @@ export function MessageComposer({
     setDraft(updated)
     onDraftChange?.(updated)
     setTimeout(() => {
-      textInputRef.current?.focus()
+      textAreaRef.current?.focus()
     }, 0)
   }
 
@@ -188,12 +228,18 @@ export function MessageComposer({
           {attachment ? (
             <div className="flex items-center gap-2 rounded-lg border border-[var(--cx-border-1)] bg-[var(--cx-surface-1)] px-2.5 py-1.5 shadow-xs">
               {isImageAttachment(attachment.name) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={attachment.url}
-                  alt="Attachment preview"
-                  className="size-7 rounded object-cover"
-                />
+                previewUrl.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl.url}
+                    alt="Attachment preview"
+                    className="size-7 rounded object-cover"
+                  />
+                ) : (
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded bg-[var(--cx-surface-3)] text-[var(--cx-text-4)]">
+                    <Paperclip className="size-3.5" />
+                  </div>
+                )
               ) : (
                 <div className="flex size-7 shrink-0 items-center justify-center rounded bg-[var(--cx-surface-3)] text-[var(--cx-brand-strong)]">
                   {getFileCategory(attachment.name) === 'code' ? (
@@ -211,7 +257,7 @@ export function MessageComposer({
                   {attachment.name}
                 </span>
                 <span className="block text-[9px] font-mono uppercase text-[var(--cx-text-4)]">
-                  {getFileExtensionLabel(attachment.name)} Attachment
+                  {getFileExtensionLabel(attachment.name)} · {formatFileSize(attachment.size)}
                 </span>
               </div>
               <button
@@ -253,60 +299,82 @@ export function MessageComposer({
         <label htmlFor="chat-composer-input" className="sr-only">
           Type a message
         </label>
-        <input
-          id="chat-composer-input"
-          ref={textInputRef}
-          value={draft}
-          onChange={(event) => {
-            setDraft(event.target.value)
-            onDraftChange?.(event.target.value)
-          }}
-          placeholder={placeholder ?? 'Type a message\u2026'}
-          maxLength={COMPOSER_MAX_CHARS}
-          disabled={disabled}
-          autoComplete="off"
-          autoFocus={autoFocus}
-          className={cn(
-            'h-11 flex-1 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] px-4 text-sm text-[var(--cx-text-1)] outline-none placeholder:text-[var(--cx-text-4)] focus:border-[var(--cx-brand)] disabled:opacity-60',
-            className,
-          )}
-        />
-        <button
-          type="button"
-          onClick={handleInsertCodeSnippet}
-          disabled={disabled || sending}
-          aria-label="Insert code snippet"
-          title="Insert code block"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] text-[var(--cx-text-2)] transition hover:border-[var(--cx-border-2)] hover:text-[var(--cx-brand-strong)] disabled:opacity-50"
-        >
-          <Code className="size-4" />
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ALLOWED_ATTACHMENT_MIME.join(',')}
-          onChange={handleFile}
-          className="sr-only"
-          aria-label="Attach a file"
-        />
-        {matchId ? (
+        {/* WhatsApp-style input pill with the code + attachment buttons tucked inside. */}
+        <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] pl-4 pr-1.5 transition focus-within:border-[var(--cx-brand)]">
+          <textarea
+            id="chat-composer-input"
+            ref={textAreaRef}
+            value={draft}
+            rows={1}
+            aria-describedby="chat-composer-remaining"
+            onChange={(event) => {
+              setDraft(event.target.value)
+              onDraftChange?.(event.target.value)
+            }}
+            onKeyDown={handleComposerKeyDown}
+            placeholder={placeholder ?? buildComposerPlaceholder(peerName)}
+            maxLength={COMPOSER_MAX_CHARS}
+            disabled={disabled}
+            autoComplete="off"
+            autoFocus={autoFocus}
+            className={cn(
+              'min-h-11 min-w-0 flex-1 resize-none bg-transparent py-3 text-sm leading-snug text-[var(--cx-text-1)] outline-none placeholder:text-[var(--cx-text-4)] disabled:opacity-60',
+              className,
+            )}
+          />
+          <span
+            id="chat-composer-remaining"
+            className={cn(
+              'shrink-0 text-[10px] font-medium tabular-nums text-[var(--cx-text-4)]',
+              !nearCharsCap && 'sr-only',
+            )}
+          >
+            {remainingChars} characters remaining
+          </span>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || sending || attaching}
-            aria-label="Attach a file"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full border border-[var(--cx-border-1)] bg-[var(--cx-surface-2)] text-[var(--cx-text-2)] transition hover:border-[var(--cx-border-2)] hover:text-[var(--cx-text-1)] disabled:opacity-50"
+            onClick={handleInsertCodeSnippet}
+            disabled={disabled || sending}
+            aria-label="Insert code snippet"
+            title="Insert code block"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--cx-text-3)] transition hover:bg-[var(--cx-surface-3)] hover:text-[var(--cx-brand-strong)] disabled:opacity-50"
           >
-            <Paperclip className="size-4" />
+            <Code className="size-[18px]" />
           </button>
-        ) : null}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ALLOWED_ATTACHMENT_MIME.join(',')}
+            onChange={handleFile}
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="Attach a file"
+          />
+          {matchId ? (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || sending || attaching}
+              aria-label="Attach a file"
+              title="Attach a file"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--cx-text-3)] transition hover:bg-[var(--cx-surface-3)] hover:text-[var(--cx-brand-strong)] disabled:opacity-50"
+            >
+              <Paperclip className="size-[18px]" />
+            </button>
+          ) : null}
+        </div>
         <button
           type="submit"
           disabled={disabled || sending || !submitReady}
           aria-label="Send message"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--cx-brand)] text-white transition hover:bg-[var(--cx-brand-strong)] disabled:opacity-50"
+          title="Send message"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--cx-brand)] text-white shadow-[0_6px_16px_rgba(207,159,82,.35)] transition hover:bg-[var(--cx-brand-strong)] disabled:opacity-40 disabled:shadow-none"
         >
-          <Send className="size-4" />
+          {sending ? (
+            <Loader2 className="size-[18px] animate-spin" />
+          ) : (
+            <Send className="size-[18px] translate-x-px" />
+          )}
         </button>
       </form>
     </div>
@@ -314,5 +382,3 @@ export function MessageComposer({
 }
 
 export default MessageComposer
-
-

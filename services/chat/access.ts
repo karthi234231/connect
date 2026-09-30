@@ -48,7 +48,18 @@ export function otherParticipantId(
     : (match.user1_id ?? '')
 }
 
-/** Statuses in which messaging is permitted (S030: only active matches). */
+/**
+ * Statuses in which messaging is permitted (S030: only active matches).
+ *
+ * PENDING DECISION (deliberate): `getInbox` surfaces `pending` matches as
+ * requests/new, but every thread operation — message send/read, markRead,
+ * reactions and realtime tokens (#52) — stays gated to `active`. "Pending
+ * read-only" was considered and rejected: it would leak thread content while
+ * message reads and realtime are locked, and the inbox already presents
+ * pending matches as awaiting a decision. The reaction service enforces the
+ * same predicate via `canMessageMatch`, so reactions cannot be read or
+ * written on a pending match.
+ */
 export const MESSAGEABLE_MATCH_STATUSES: readonly string[] = ['active']
 
 /** Pure predicate: is the match in a state that permits messaging? */
@@ -65,7 +76,8 @@ export function canMessageMatch(match: { status?: string }): boolean {
  * Throws:
  * - 404 when the match does not exist
  * - 403 when the user is not a participant
- * - 403 when the match is not active/pending
+ * - 403 when the match is not active (pending matches stay locked — see
+ *   MESSAGEABLE_MATCH_STATUSES)
  */
 export async function assertThreadAccess(
   supabase: ServerSupabase,

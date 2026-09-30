@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto'
 import { z } from 'zod'
 
 import { requireUser } from '@/lib/auth'
-import { AppError, ErrorCodes } from '@/lib/errors'
+import { AppError, ErrorCodes, toErrorPayload } from '@/lib/errors'
 import { logger } from '@/lib/logger'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { uuidSchema } from '@/lib/validation'
@@ -26,6 +26,7 @@ import {
   removeReaction,
   toggleReaction,
 } from '@/services/chat/reaction.service'
+import { MESSAGE_REACTIONS } from '@/lib/chat/reactions'
 import {
   dismissSuggestion,
   RELATIONSHIP_SUGGESTION_SOURCES,
@@ -52,7 +53,17 @@ const messageInputSchema = z
     matchId: uuidSchema,
     content: z.string().min(1).max(2000),
     clientMessageId: uuidSchema.optional(),
-    attachmentUrl: z.string().trim().min(1).max(500).optional(),
+    // Shape-checked here exactly as the service schema does: the storage path
+    // always begins with the match-attachments bucket (buildAttachmentPath),
+    // so the boundary rejects absolute/external URLs with a clean VALIDATION
+    // error instead of leaking a raw ZodError into toErrorPayload.
+    attachmentUrl: z
+      .string()
+      .trim()
+      .min(1)
+      .max(512)
+      .startsWith('match-attachments/')
+      .optional(),
   })
   .strict()
 
@@ -64,13 +75,18 @@ const attachmentUploadInputSchema = z
   .object({
     matchId: uuidSchema,
     fileName: z.string().trim().min(1).max(255),
-    mimeType: z.string().trim().min(1).max(120),
+    mimeType: z.string().trim().min(3).max(100),
     sizeBytes: z.number().int().positive(),
   })
   .strict()
 
 const reactionInputSchema = z
-  .object({ messageId: uuidSchema, emoji: z.string().trim().min(1).max(16) })
+  .object({
+    messageId: uuidSchema,
+    // Shared allowlist (lib/chat/reactions.ts) so the boundary, the service
+    // and the UI can never drift on what emoji reaches storage.
+    emoji: z.enum(MESSAGE_REACTIONS as unknown as [string, ...string[]]),
+  })
   .strict()
 
 const reactionsInputSchema = z
@@ -94,22 +110,36 @@ const typingInputSchema = z
   .object({ matchId: uuidSchema, isTyping: z.boolean() })
   .strict()
 
+/**
+ * IO-05 — the failure leg of every chat boundary action routed through the
+ * client API layer (`client/api/chat.ts`). Success returns stay byte-identical
+ * to the raw service payload; the client wrapper throws `new Error(result.error)`
+ * when it sees this shape, so callers that try/catch today keep working.
+ */
+type ChatActionFailure = { ok: false; error: string }
+
 export async function getMessagesAction(input: {
   matchId: string
   limit?: number
   cursor?: string
-}): Promise<Awaited<ReturnType<typeof getMessages>>> {
-  const userId = await requireUser()
+}): Promise<
+  Awaited<ReturnType<typeof getMessages>> | ChatActionFailure
+> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = messagesInputSchema.safeParse(input)
+    const parsed = messagesInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That conversation is not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    const { matchId, limit, cursor } = parsed.data
+
+    return getMessages(userId, matchId, cursor, limit ?? 50)
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  const { matchId, limit, cursor } = parsed.data
-
-  return getMessages(userId, matchId, cursor, limit ?? 20)
 }
 
 export async function getThreadPeerAction(input: { matchId: string }): Promise<{
@@ -146,51 +176,65 @@ export async function sendMessageAction(input: {
   content: string
   clientMessageId?: string
   attachmentUrl?: string
-}): Promise<Awaited<ReturnType<typeof sendMessage>>> {
-  const userId = await requireUser()
+}): Promise<
+  Awaited<ReturnType<typeof sendMessage>> | ChatActionFailure
+> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = messageInputSchema.safeParse(input)
+    const parsed = messageInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That message could not be sent.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    return sendMessage(userId, {
+      matchId: parsed.data.matchId,
+      content: parsed.data.content,
+      // Every gesture carries an idempotency key so an optimistic retry cannot
+      // double-write the thread; mint one when the client omitted it.
+      clientMessageId: parsed.data.clientMessageId ?? randomUUID(),
+      attachmentUrl: parsed.data.attachmentUrl,
+    })
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  return sendMessage(userId, {
-    matchId: parsed.data.matchId,
-    content: parsed.data.content,
-    // Every gesture carries an idempotency key so an optimistic retry cannot
-    // double-write the thread; mint one when the client omitted it.
-    clientMessageId: parsed.data.clientMessageId ?? randomUUID(),
-    attachmentUrl: parsed.data.attachmentUrl,
-  })
 }
 
 export async function markMessagesAsReadAction(input: {
   matchId: string
-}): Promise<void> {
-  const userId = await requireUser()
+}): Promise<void | ChatActionFailure> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = matchInputSchema.safeParse(input)
+    const parsed = matchInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That conversation is not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    await markMessagesAsRead(userId, parsed.data.matchId)
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  await markMessagesAsRead(userId, parsed.data.matchId)
 }
 
 export async function getAttachmentUrlAction(input: {
   path: string
-}): Promise<{ signedUrl: string }> {
-  const userId = await requireUser()
+}): Promise<{ signedUrl: string } | ChatActionFailure> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = attachmentPathSchema.safeParse(input)
+    const parsed = attachmentPathSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That attachment is not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    return getAttachmentUrl(userId, parsed.data.path)
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  return getAttachmentUrl(userId, parsed.data.path)
 }
 
 export async function createAttachmentUploadAction(input: {
@@ -198,64 +242,84 @@ export async function createAttachmentUploadAction(input: {
   fileName: string
   mimeType: string
   sizeBytes: number
-}): Promise<Awaited<ReturnType<typeof createAttachmentUpload>>> {
-  const userId = await requireUser()
+}): Promise<
+  Awaited<ReturnType<typeof createAttachmentUpload>> | ChatActionFailure
+> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = attachmentUploadInputSchema.safeParse(input)
+    const parsed = attachmentUploadInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That attachment is not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    return createAttachmentUpload(
+      userId,
+      parsed.data as Parameters<typeof createAttachmentUpload>[1],
+    )
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  return createAttachmentUpload(
-    userId,
-    parsed.data as Parameters<typeof createAttachmentUpload>[1],
-  )
 }
 
 export async function getMessageReactionsAction(input: {
   matchId: string
   messageIds: string[]
-}): Promise<Awaited<ReturnType<typeof getReactions>>> {
-  const userId = await requireUser()
+}): Promise<
+  Awaited<ReturnType<typeof getReactions>> | ChatActionFailure
+> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = reactionsInputSchema.safeParse(input)
+    const parsed = reactionsInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'Those reactions are not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    return getReactions(userId, parsed.data)
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  return getReactions(userId, parsed.data)
 }
 
 export async function toggleReactionAction(input: {
   messageId: string
   emoji: string
-}): Promise<void> {
-  const userId = await requireUser()
+}): Promise<void | ChatActionFailure> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = reactionInputSchema.safeParse(input)
+    const parsed = reactionInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That reaction is not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    await toggleReaction(userId, parsed.data)
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  await toggleReaction(userId, parsed.data)
 }
 
 export async function removeReactionAction(input: {
   messageId: string
   emoji: string
-}): Promise<void> {
-  const userId = await requireUser()
+}): Promise<void | ChatActionFailure> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = reactionInputSchema.safeParse(input)
+    const parsed = reactionInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That reaction is not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    await removeReaction(userId, parsed.data)
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  await removeReaction(userId, parsed.data)
 }
 
 export async function searchMessagesAction(input: {
@@ -350,24 +414,28 @@ export async function getAblyTokenAction(input: {
 export async function publishTypingAction(input: {
   matchId: string
   isTyping: boolean
-}): Promise<void> {
-  const userId = await requireUser()
+}): Promise<void | ChatActionFailure> {
+  try {
+    const userId = await requireUser()
 
-  const parsed = typingInputSchema.safeParse(input)
+    const parsed = typingInputSchema.safeParse(input)
 
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION, 'That status is not valid.')
+    if (!parsed.success) {
+      return { ok: false, error: toErrorPayload(parsed.error).message }
+    }
+
+    await assertThreadAccessForUser(userId, parsed.data.matchId)
+
+    await publishChatEvent(
+      parsed.data.matchId,
+      buildTypingEnvelope({
+        eventId: randomUUID(),
+        actorId: userId,
+        conversationId: parsed.data.matchId,
+        isTyping: parsed.data.isTyping,
+      }),
+    )
+  } catch (error) {
+    return { ok: false, error: toErrorPayload(error).message }
   }
-
-  await assertThreadAccessForUser(userId, parsed.data.matchId)
-
-  await publishChatEvent(
-    parsed.data.matchId,
-    buildTypingEnvelope({
-      eventId: randomUUID(),
-      actorId: userId,
-      conversationId: parsed.data.matchId,
-      isTyping: parsed.data.isTyping,
-    }),
-  )
 }

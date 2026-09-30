@@ -21,3 +21,15 @@ export function cleanComposerText(text: string): string {
 export function canSubmitDraft(text: string, hasAttachment: boolean): boolean {
   return hasAttachment || cleanComposerText(text).length > 0
 }
+
+/**
+ * Placeholder for the empty composer. Personalizes with the peer's first name
+ * ("Message Ada…") when known, else falls back to the generic prompt —
+ * matching the legacy mock behavior.
+ */
+export function buildComposerPlaceholder(
+  peerFirstName?: string | null,
+): string {
+  const name = peerFirstName?.trim()
+  return name ? `Message ${name}\u2026` : 'Type a message\u2026'
+}

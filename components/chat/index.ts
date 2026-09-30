@@ -5,8 +5,5 @@ export { TypingIndicator } from './typing-indicator'
 export { ThreadList } from './thread-list'
 export type { ChatThread } from './thread-list'
 export { MessageComposer } from './MessageComposer'
-export type {
-  ComposerConnectionState,
-  ComposerSendDraft,
-} from './MessageComposer'
+export type { ComposerSendDraft } from './MessageComposer'
 export { MediaLightbox } from './media-lightbox'

@@ -6,10 +6,10 @@ import { z } from 'zod'
 import { uuidSchema } from '@/lib/validation'
 import { MESSAGE_REACTIONS } from '@/lib/chat/reactions'
 
-const emojiSchema = z.enum(
-  // `as const` array → non-empty tuple for z.enum.
-  MESSAGE_REACTIONS as unknown as [string, ...string[]],
-)
+// Loose `string` elements keep ToggleReactionInput callable by consumers that
+// type emoji as plain string; the z.enum allowlist is enforced at parse time
+// (the runtime trust boundary), never widened at the boundary.
+const emojiSchema = z.enum(MESSAGE_REACTIONS as unknown as [string, ...string[]])
 
 export const toggleReactionSchema = z
   .object({

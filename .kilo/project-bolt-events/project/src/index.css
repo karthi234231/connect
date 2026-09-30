@@ -1,0 +1,382 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Background — Deepfield */
+    --cx-bg: #0A0C0F;
+    --cx-bg-2: #101317;
+    --cx-bg-3: #151A1F;
+
+    /* Surfaces */
+    --cx-surface-1: #101317;
+    --cx-surface-2: #151A1F;
+    --cx-surface-3: #1B2127;
+    --cx-surface-4: #222930;
+
+    /* Borders */
+    --cx-border-1: #293038;
+    --cx-border-2: #3A434C;
+    --cx-border-3: #56616B;
+
+    /* Text */
+    --cx-text-1: #F1EEE7;
+    --cx-text-2: #C3C0B9;
+    --cx-text-3: #8D8A84;
+    --cx-text-4: #666762;
+
+    /* Brand — executive editorial gold */
+    --cx-brand: #D0A45B;
+    --cx-brand-strong: #E0B874;
+    --cx-brand-soft: #312719;
+    --cx-brand-quiet: #5B482E;
+    --cx-aurora-a: #D0A45B;
+    --cx-aurora-b: #C0A274;
+    --cx-aurora: linear-gradient(120deg, #D0A45B, #C0A274);
+
+    /* Accent — ember */
+    --cx-ember: #E4B86A;
+    --cx-copper: #C98E5E;
+    --cx-copper-soft: #34291E;
+
+    /* Semantic */
+    --cx-success: #72C59A;
+    --cx-success-soft: #173126;
+    --cx-warning: #E4B86A;
+    --cx-warning-soft: #3A2E1D;
+    --cx-danger: #E47D72;
+    --cx-danger-soft: #38211E;
+    --cx-info: #84B9D8;
+    --cx-info-soft: #202F38;
+
+    /* Layout */
+    --cx-max-width: 1280px;
+    --cx-content-width: 1120px;
+    --cx-reading-width: 760px;
+    --cx-nav-height: 72px;
+
+    /* Spacing */
+    --cx-space-2: 2px;
+    --cx-space-4: 4px;
+    --cx-space-6: 6px;
+    --cx-space-8: 8px;
+    --cx-space-10: 10px;
+    --cx-space-12: 12px;
+    --cx-space-16: 16px;
+    --cx-space-20: 20px;
+    --cx-space-24: 24px;
+    --cx-space-28: 28px;
+    --cx-space-32: 32px;
+    --cx-space-40: 40px;
+    --cx-space-48: 48px;
+    --cx-space-56: 56px;
+    --cx-space-64: 64px;
+    --cx-space-80: 80px;
+    --cx-space-96: 96px;
+
+    /* Radius */
+    --cx-radius-sm: 8px;
+    --cx-radius-md: 10px;
+    --cx-radius-lg: 12px;
+    --cx-radius-card: 16px;
+    --cx-radius-xl: 18px;
+    --cx-radius-hero: 20px;
+    --cx-radius-hero-lg: 24px;
+    --cx-radius-pill: 9999px;
+
+    /* Motion */
+    --cx-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --cx-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+    --cx-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --cx-ease-spring: cubic-bezier(0.22, 1.4, 0.36, 1);
+    --cx-duration-fast: 120ms;
+    --cx-duration-base: 220ms;
+    --cx-duration-slow: 320ms;
+    --cx-duration-spring: 560ms;
+    --cx-duration-drift: 700ms;
+
+    /* Typography */
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display: "Instrument Serif", "Inter", ui-serif, Georgia, serif;
+    --cx-display-size: 40px;
+    --cx-display-line: 48px;
+    --cx-h1-size: 32px;
+    --cx-h1-line: 40px;
+    --cx-h2-size: 24px;
+    --cx-h2-line: 32px;
+    --cx-h3-size: 20px;
+    --cx-h3-line: 28px;
+    --cx-body-lg-size: 17px;
+    --cx-body-lg-line: 26px;
+    --cx-body-size: 15px;
+    --cx-body-line: 23px;
+    --cx-body-sm-size: 13px;
+    --cx-body-sm-line: 20px;
+    --cx-label-size: 12px;
+    --cx-label-line: 16px;
+    --cx-micro-size: 11px;
+    --cx-micro-line: 14px;
+
+    /* Interaction */
+    --cx-control-height-mobile: 48px;
+    --cx-control-height-desktop: 44px;
+    --cx-icon-hit-area: 44px;
+
+    /* Depth */
+    --cx-shadow-card: 0 12px 32px rgba(0, 0, 0, 0.16);
+    --cx-shadow-elevated: 0 24px 64px rgba(0, 0, 0, 0.28);
+    --cx-shadow-dialog: 0 32px 96px rgba(0, 0, 0, 0.42);
+
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after {
+    border-color: var(--cx-border-1);
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 320px;
+    background: var(--cx-bg);
+    scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background:
+      radial-gradient(circle at 74% 0%, rgba(208, 164, 91, 0.06), transparent 28%),
+      var(--cx-bg);
+    color: var(--cx-text-1);
+    font-family: var(--font-sans);
+    font-size: var(--cx-body-size);
+    line-height: var(--cx-body-line);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  html {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  ::selection {
+    background: var(--cx-brand);
+    color: var(--cx-bg);
+  }
+
+  a { color: inherit; }
+  button, input, select, textarea { font: inherit; }
+  button { -webkit-tap-highlight-color: transparent; }
+
+  :focus-visible {
+    outline: 2px solid var(--cx-brand-strong);
+    outline-offset: 3px;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    margin: 0;
+    color: var(--cx-text-1);
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  p { text-wrap: pretty; }
+  img, svg { display: block; }
+
+  input::placeholder, textarea::placeholder {
+    color: var(--cx-text-4);
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .font-display { font-family: var(--font-display); }
+  .font-sans { font-family: var(--font-sans); }
+
+  .cx-page-enter { animation: cx-enter 420ms cubic-bezier(.22, 1, .36, 1) both; }
+  .cx-dialog-enter { animation: cx-dialog-in 260ms cubic-bezier(.22, 1, .36, 1) both; }
+
+  .cx-aurora-text {
+    background: linear-gradient(120deg, var(--cx-aurora-a), var(--cx-aurora-b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .cx-aurora-fill {
+    background: linear-gradient(120deg, var(--cx-aurora-a), var(--cx-aurora-b));
+  }
+
+  .cx-glass {
+    background: color-mix(in srgb, var(--cx-surface-2) 72%, transparent);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  }
+
+  .cx-lift {
+    transition:
+      transform var(--cx-duration-base) var(--cx-ease-enter),
+      box-shadow var(--cx-duration-base) var(--cx-ease-enter);
+  }
+  .cx-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--cx-shadow-elevated);
+  }
+
+  .cx-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+  .cx-sheen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+    transform: translateX(-110%);
+    transition: transform var(--cx-duration-slow) var(--cx-ease-enter);
+  }
+  .cx-sheen:hover::before {
+    transform: translateX(110%);
+  }
+
+  .cx-hairline {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cx-border-2) 92%, transparent) 16%, color-mix(in srgb, var(--cx-border-2) 92%, transparent) 84%, transparent);
+  }
+
+  .cx-nav-pill {
+    background:
+      linear-gradient(120deg, color-mix(in srgb, var(--cx-aurora-a) 24%, transparent), color-mix(in srgb, var(--cx-aurora-b) 16%, transparent)) padding-box,
+      var(--cx-surface-2);
+    border-color: color-mix(in srgb, var(--cx-aurora-a) 34%, var(--cx-border-2));
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--cx-aurora-a) 16%, transparent);
+  }
+
+  .cx-fab {
+    background: linear-gradient(120deg, var(--cx-aurora-a), var(--cx-aurora-b));
+    color: var(--cx-bg);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--cx-aurora-a) 38%, transparent), inset 0 1px 0 color-mix(in srgb, white 22%, transparent);
+  }
+
+  .cx-tnum { font-variant-numeric: tabular-nums; }
+
+  .cx-eyebrow-mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .cx-no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .cx-no-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .cx-animate-fade-up {
+    animation: cx-fade-up var(--cx-duration-base) var(--cx-ease-enter) both;
+    animation-delay: calc(var(--cx-i, 0) * 60ms);
+  }
+}
+
+@keyframes cx-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cx-dialog-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cx-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cx-drift {
+  from { transform: translate3d(-4%, -2%, 0) scale(1); }
+  to { transform: translate3d(4%, 3%, 0) scale(1.08); }
+}
+
+@keyframes cx-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes cx-typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.cx-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--cx-text-3);
+  animation: cx-typing 1.1s ease-in-out infinite;
+}
+.cx-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.cx-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+.cx-aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(72px);
+  pointer-events: none;
+  animation: cx-drift 14s ease-in-out infinite alternate;
+}
+
+.cx-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--cx-surface-3);
+}
+.cx-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--cx-aurora-a) 22%, transparent) 50%, transparent 80%);
+  animation: cx-shimmer 1.6s var(--cx-ease-standard) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .cx-page-enter, .cx-dialog-enter, .cx-animate-fade-up { animation: none !important; }
+  .cx-aurora-blob, .cx-skeleton::after, .cx-typing-dot { animation: none !important; }
+  .cx-sheen::before { display: none; }
+  .cx-lift:hover { transform: none; }
+}

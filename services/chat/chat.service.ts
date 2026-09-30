@@ -18,6 +18,7 @@ import {
 import { getAdminSupabaseClient } from '@/lib/supabase/admin'
 import { isMatchReason, matchReasonLabel } from '@/services/matching/reasons'
 import { z } from 'zod'
+import { uuidSchema } from '@/lib/validation'
 
 export { rowToMessage, type Message } from './mappers'
 
@@ -40,6 +41,14 @@ function normalizeLimit(value: number, fallback = 50): number {
   return Math.min(Math.max(Math.trunc(value), 1), 50)
 }
 
+/**
+ * Non-empty caption persisted for an attachment-only send (empty content +
+ * attachmentUrl present). The composer allows this gesture
+ * (`canSubmitDraft`), and `messages.content` is NOT NULL with a 1..2000
+ * length check — the DB cannot store an empty body.
+ */
+export const ATTACHMENT_ONLY_CAPTION = 'Attachment'
+
 export async function sendMessage(
   senderId: string,
   input: SendMessageInput,
@@ -48,7 +57,19 @@ export async function sendMessage(
 
   const validated = sendMessageSchema.parse(input)
 
-  const { matchId, content, clientMessageId, attachmentUrl } = validated
+  const { matchId, clientMessageId, attachmentUrl } = validated
+
+  // Attachment-only sends must still persist a non-empty caption (DB parity:
+  // messages.content is NOT NULL with a 1..2000 length check). The composer
+  // lets a send through when only an attachment is queued, so the service
+  // closes the loop here rather than at the schema.
+  let content = validated.content
+  if (content.length === 0) {
+    if (!attachmentUrl) {
+      throw new AppError(ErrorCodes.VALIDATION, 'Message cannot be empty.')
+    }
+    content = ATTACHMENT_ONLY_CAPTION
+  }
 
   // 1) Pure shape check — no I/O, no data observable. The path's match segment
   //    must equal the message's matchId (a path minted for another match is
@@ -71,36 +92,11 @@ export async function sendMessage(
   //    failure, so a block-check outage never opens the channel.
   await assertCanMessagePair(senderId, otherParticipantId(match, senderId))
 
-  // 4) Attachment must already exist in storage (upload completes before
-  //    send). Runs after authorization, so the probe is scoped to a match the
-  //    sender provably participates in, and rejects forged object paths that
-  //    pass the pattern check but were never uploaded.
-  if (attachmentUrl) {
-    const objectPath = attachmentUrl.split('/').slice(1).join('/')
-    const { data: objectHead, error: objectError } =
-      await getAdminSupabaseClient()
-        .storage.from(MATCH_ATTACHMENTS_BUCKET)
-        .list(objectPath.split('/').slice(0, -1).join('/'), {
-          search: objectPath.split('/').pop() ?? '',
-          limit: 1,
-        })
-
-    if (objectError || !objectHead || objectHead.length === 0) {
-      logger.warn('Attachment upload not found at send time', {
-        matchId,
-        attachmentUrl,
-        error: objectError?.message,
-      })
-      throw new AppError(
-        ErrorCodes.VALIDATION,
-        'Attachment upload not found. Upload the file before sending.',
-      )
-    }
-  }
-
-  // 5) Idempotency: repeated client_message_id converges to the SAME logical
+  // 4) Idempotency: repeated client_message_id converges to the SAME logical
   //    message. Only rows claimed by the same sender for the same match may be
-  //    returned; a key owned by another sender/match is FORBIDDEN.
+  //    returned; a key owned by another sender/match is FORBIDDEN. Runs before
+  //    the storage probe so a duplicate retry converges even if the uploaded
+  //    object was cleaned up since, and never double-fans-out.
   const existingQuery = await supabase
     .from('messages')
     .select(
@@ -133,6 +129,34 @@ export async function sendMessage(
     }
 
     return rowToMessage(existing)
+  }
+
+  // 5) Attachment must already exist in storage (upload completes before
+  //    send). Runs after authorization + idempotency: the probe is scoped to a
+  //    match the sender provably participates in, only fires on fresh sends,
+  //    and rejects forged object paths that pass the pattern check but were
+  //    never uploaded.
+  if (attachmentUrl) {
+    const objectPath = attachmentUrl.split('/').slice(1).join('/')
+    const { data: objectHead, error: objectError } =
+      await getAdminSupabaseClient()
+        .storage.from(MATCH_ATTACHMENTS_BUCKET)
+        .list(objectPath.split('/').slice(0, -1).join('/'), {
+          search: objectPath.split('/').pop() ?? '',
+          limit: 1,
+        })
+
+    if (objectError || !objectHead || objectHead.length === 0) {
+      logger.warn('Attachment upload not found at send time', {
+        matchId,
+        attachmentUrl,
+        error: objectError?.message,
+      })
+      throw new AppError(
+        ErrorCodes.VALIDATION,
+        'Attachment upload not found. Upload the file before sending.',
+      )
+    }
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -244,20 +268,27 @@ export async function sendMessage(
   })
 
   // S032: realtime delivery accelerator — fan out AFTER commit (the DB stays
-  // the source of truth; clients reconcile via refetch if this fails).
+  // the source of truth; clients reconcile via refetch if this fails). The
+  // payload stays MessagePayload-shaped and carries clientMessageId + senderId
+  // so a later subscriber can swap its `optimistic-<clientMessageId>` row for
+  // this authoritative one (mergeRealtimeMessage keys on senderId/content;
+  // clientMessageId resolves ambiguous identical sends).
+  const envelopeMessage = {
+    matchId,
+    id: message.id,
+    senderId,
+    content: message.content,
+    createdAt: message.created_at,
+    clientMessageId,
+  }
+
   await publishChatEvent(
     matchId,
     buildMessageEnvelope({
       eventId: crypto.randomUUID(),
       actorId: senderId,
       conversationId: matchId,
-      message: {
-        matchId,
-        id: message.id,
-        senderId,
-        content: message.content,
-        createdAt: message.created_at,
-      },
+      message: envelopeMessage,
     }),
   )
 
@@ -310,6 +341,17 @@ const inboxCursorSchema = z
   .object({
     lastMessageAt: z.string().datetime(),
     matchId: z.string().uuid(),
+  })
+  .strict()
+
+// Keyset cursor for the message page: (created_at, id) tuple, base64-encoded.
+// Validated here so a crafted cursor never reaches PostgREST as an invalid
+// timestamp/uuid filter (which would surface as a 500 instead of a clean
+// VALIDATION 400).
+const messageCursorSchema = z
+  .object({
+    c: z.string().datetime(),
+    id: uuidSchema,
   })
   .strict()
 
@@ -528,18 +570,19 @@ export async function getMessages(
   if (cursor) {
     // #53: keyset cursor = (created_at, id) tuple, base64-encoded. Timestamp
     // alone can split ties and skip/duplicate messages within the same second.
-    let decoded: { c?: unknown; id?: unknown }
+    let decoded: unknown
     try {
       decoded = JSON.parse(Buffer.from(cursor, 'base64').toString('utf8'))
     } catch {
       throw new AppError(ErrorCodes.VALIDATION, 'Malformed cursor')
     }
-    if (typeof decoded.c !== 'string' || typeof decoded.id !== 'string') {
+    const parsedCursor = messageCursorSchema.safeParse(decoded)
+    if (!parsedCursor.success) {
       throw new AppError(ErrorCodes.VALIDATION, 'Malformed cursor')
     }
     // Escape quotes for the PostgREST .or() value syntax.
-    const c = decoded.c.replace(/'/g, "''")
-    const id = decoded.id.replace(/'/g, "''")
+    const c = parsedCursor.data.c.replace(/'/g, "''")
+    const id = parsedCursor.data.id.replace(/'/g, "''")
     query = query.or(`and(created_at.eq.${c},id.lt.${id}),created_at.lt.${c}`)
   }
 

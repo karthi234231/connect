@@ -8,6 +8,17 @@ import { logger } from '@/lib/logger'
 import { getAblyServerClient } from '@/lib/websocket/ably'
 import type { ChatEventEnvelope } from './realtime'
 
+// Export the event contract so server-side fan-out consumers can import the
+// envelope surface from a single module without reaching into ./realtime.
+export type {
+  ChatEventEnvelope,
+  ChatRealtimeEventType,
+  MessagePayload,
+  TypingPayload,
+  ReceiptPayload,
+  ReactionPayload,
+} from './realtime'
+
 export async function publishChatEvent(
   matchId: string,
   envelope: ChatEventEnvelope,
@@ -18,6 +29,7 @@ export async function publishChatEvent(
   } catch (error) {
     logger.warn('Failed to publish chat realtime event', {
       matchId,
+      eventId: envelope.eventId,
       eventType: envelope.type,
       error,
     })

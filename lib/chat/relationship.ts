@@ -14,14 +14,14 @@ import type { Profile } from '@/services/profiles/mappers'
 
 /**
  * Authoritative shared facts between two participants. Every field is derived
- * from real profile data; an absent field means "no shared fact" — never filler..
+ * from real profile data; an absent field means "no shared fact" — never filler.
  */
 export interface SharedContext {
   /** Shared role in infinitive form ("founder" → "founding"), or null when absent. */
   sharedRole: string | null
-  /** Intersection of the two profiles' skills. */
+  /** Case-insensitive intersection of the two profiles' skills (other's casing). */
   sharedSkills: string[]
-  /** Both profiles list the same timezone. */
+  /** Both profiles list the same timezone (case-insensitive, non-empty). */
   sameTimezone: boolean
 }
 
@@ -47,7 +47,7 @@ const ROLE_NOUN: Record<string, string> = {
   other: 'their field',
 }
 
-/** Title-case a role enum: "data_ml" → "Data & ML". Unknown roles keep as is.. */
+/** Title-case a role enum: "data_ml" → "Data & ML". Unknown roles keep as is. */
 export function formatRole(role: string): string {
   const key = (role ?? '').trim()
 
@@ -60,7 +60,7 @@ export function formatRole(role: string): string {
 
 /**
  * Build shared context between the viewer and the other participant using ONLY
- * authoritative profile fields. Never fabricates reasons that doesn't exist..
+ * authoritative profile fields. Never fabricates reasons that do not exist.
  */
 export function buildSharedContext(
   viewer: Pick<Profile, 'role' | 'skills' | 'timezone'>,
@@ -75,27 +75,34 @@ export function buildSharedContext(
       .filter(Boolean),
   )
 
-  const sharedSkills = (other.skills ?? []).filter((skill) =>
-    viewerSkillSet.has(skill.trim().toLowerCase()),
-  )
+  // Case-insensitive intersection that preserves the other participant's
+  // casing and keeps the first occurrence: "Python" and "python" collapse to
+  // a single shared skill so prompts never pose a duplicate fact twice.
+  const seen = new Set<string>()
+  const sharedSkills: string[] = []
+  for (const skill of other.skills ?? []) {
+    const candidate = skill.trim()
+    if (!candidate) continue
+    const fold = candidate.toLowerCase()
+    if (!viewerSkillSet.has(fold) || seen.has(fold)) continue
+    seen.add(fold)
+    sharedSkills.push(candidate)
+  }
 
-  const viewerTz = (viewer.timezone ?? '').trim()
-  const otherTz = (other.timezone ?? '').trim()
+  const viewerTz = (viewer.timezone ?? '').trim().toLowerCase()
+  const otherTz = (other.timezone ?? '').trim().toLowerCase()
 
   return {
     sharedRole:
       viewerRole !== '' && viewerRole === otherRole
         ? (ROLE_NOUN[viewerRole] ?? formatRole(viewerRole))
         : null,
-    sharedSkills:
-      sharedSkills.length === 0
-        ? []
-        : Array.from(new Set(sharedSkills.map((skill) => skill.trim()))),
+    sharedSkills,
     sameTimezone: Boolean(viewerTz.length > 0 && viewerTz === otherTz),
   }
 }
 
-/** A one-line, truthful "why you may get along" line; null when no shared fact exists.. */
+/** One-line, truthful "why you may get along" line; null when no shared fact exists. */
 export function shareReasonLine(context: SharedContext): string | null {
   if (context.sharedRole) {
     return `You both work in ${context.sharedRole}.`
@@ -112,9 +119,17 @@ export function shareReasonLine(context: SharedContext): string | null {
   return null
 }
 
+/** Stable identifiers a dismissal/suppression UI can key on. */
+export type StarterPromptKey =
+  | 'shared-role'
+  | 'shared-skill'
+  | 'other-skill'
+  | 'role'
+  | 'hello'
+
 export interface StarterPrompt {
   /** Stable id for local dismissal/suppression. */
-  key: string
+  key: StarterPromptKey
   /** Source category (matches server dismissal semantics where applicable). */
   source: RelationshipSuggestionSource
 
@@ -122,12 +137,15 @@ export interface StarterPrompt {
   text: string
 }
 
-const MAX_STARTERS = 3
+/** Upper bound on starters surfaced at once (deterministic slice). */
+export const MAX_STARTERS = 3
 
 /**
  * Relationship-specific first-message suggestions, built deterministically from
- * shared profile facts. Always at least one truthful option ground in the
- * relationship (shared role/skill, other's role/skill, or a name-based greeting).
+ * shared profile facts. Priority mirrors `shareReasonLine` (shared role →
+ * shared skill → other's role), so the top prompt always agrees with the reason
+ * line. Always at least one truthful option grounded in the relationship
+ * (shared role/skill, other's role, or a name-based greeting).
  */
 export function buildStarterPrompts(
   context: SharedContext,
@@ -135,18 +153,12 @@ export function buildStarterPrompts(
 ): StarterPrompt[] {
   const firstName = other.fullName?.split(/\s+/).filter(Boolean)[0] ?? 'there'
   const otherRole = formatRole(other.role ?? '')
+  const firstSkill = context.sharedSkills[0]?.trim() ?? ''
+  const secondSkill = context.sharedSkills[1]?.trim() ?? ''
 
   const prompts: StarterPrompt[] = []
 
-  if (context.sharedSkills.length > 0) {
-    prompts.push({
-      key: 'shared-skill',
-      source: 'shared_skill',
-      text: `We both have ${context.sharedSkills[0]} — how did you get into that?`,
-    })
-  }
-
-  if (context.sharedSkills.length === 0 && context.sharedRole !== null) {
+  if (context.sharedRole) {
     prompts.push({
       key: 'shared-role',
       source: 'shared_interest',
@@ -154,11 +166,11 @@ export function buildStarterPrompts(
     })
   }
 
-  if (otherRole) {
+  if (context.sharedSkills.length > 0) {
     prompts.push({
-      key: 'role',
-      source: 'shared_interest',
-      text: `I'm curious how you got started in ${otherRole}.`,
+      key: 'shared-skill',
+      source: 'shared_skill',
+      text: `We both have ${firstSkill} — how did you get into that?`,
     })
   }
 
@@ -166,11 +178,21 @@ export function buildStarterPrompts(
     prompts.push({
       key: 'other-skill',
       source: 'shared_skill',
-      text: `We also both know ${context.sharedSkills[1]} — have you used it recently?`,
+      text: `We also both know ${secondSkill} — have you used it recently?`,
     })
   }
 
-  // Guarantee one non-empty option, tied to the relationship via their name..
+  // Only when no shared role exists does the other's own role get its own
+  // prompt; otherwise it would duplicate the shared-role starter.
+  if (!context.sharedRole && otherRole) {
+    prompts.push({
+      key: 'role',
+      source: 'shared_interest',
+      text: `I'm curious how you got started in ${otherRole}.`,
+    })
+  }
+
+  // Guarantee one non-empty option, tied to the relationship via their name.
   if (prompts.length === 0) {
     prompts.push({
       key: 'hello',
@@ -194,7 +216,7 @@ function hoursBetween(earlierIso: string, laterIso: string): number {
 
 /**
  * No-reply reminder, shown ONLY after the awaiting threshold has elapsed since
- * the viewer's last message. Uses gentle, non-guilt-inducing language..
+ * the viewer's last message. Uses gentle, non-guilt-inducing language.
  */
 export function buildReminder(
   lastMessageAt: string,
@@ -223,7 +245,7 @@ export function buildReminder(
   }
 }
 
-/** True when there is an authoritative fact we can anchor a next-action suggestion on.. */
+/** True when there is an authoritative fact we can anchor a next-action suggestion on. */
 export function hasActionableContext(context: SharedContext): boolean {
   return Boolean(
     context.sharedRole ||

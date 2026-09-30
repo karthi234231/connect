@@ -1,12 +1,7 @@
 import Ably from 'ably'
 
 export type ConnectionState =
-  | 'idle'
-  | 'connecting'
-  | 'connected'
-  | 'reconnecting'
-  | 'offline'
-  | 'closed'
+  'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline' | 'closed'
 
 export type NetworkStatus = 'online' | 'offline'
 
@@ -52,6 +47,30 @@ export function calculateBackoffDelay(
   // Apply random jitter between 80% and 120% of capped delay
   const randomFactor = 0.8 + Math.random() * 0.4
   return Math.floor(capped * randomFactor)
+}
+
+/**
+ * Builds a synthetic dedupe key for messages that arrive without an Ably
+ * message id (e.g. reconnect redelivery or non-Ably producers).
+ *
+ * When the payload carries an S032 envelope (`{ eventId, type, ... }`) the
+ * `eventId` is used as the discriminator so two legitimate distinct events
+ * that happen to carry identical `name` + `data` never collide. Otherwise the
+ * fallback is `name:JSON.stringify(data)`.
+ */
+export function buildDedupeKey(message: {
+  name?: string
+  data?: unknown
+}): string {
+  const name = message.name ?? ''
+  const data = message.data
+  if (data && typeof data === 'object') {
+    const record = data as { eventId?: unknown }
+    if (typeof record.eventId === 'string' && record.eventId.length > 0) {
+      return `${name}:${record.eventId}`
+    }
+  }
+  return `${name}:${JSON.stringify(data)}`
 }
 
 /**
@@ -178,14 +197,40 @@ export class NetworkMonitor {
 }
 
 /**
+ * Per-subscription entry registered against a channel. `boundHandler` wraps
+ * the user handler with inbound dedupe + normalization and is the SAME
+ * function reference handed to `channel.subscribe(...)` and
+ * `channel.unsubscribe(eventName, boundHandler)` — so unsubscribing one
+ * subscription never removes another handler registered under the same event
+ * name, and resubscribing after a reconnect registers the same listener.
+ */
+interface ChannelSubscriptionEntry {
+  eventName: string
+  handler: MessageHandler
+  boundHandler: (message: Ably.InboundMessage) => void
+}
+
+/**
  * Ably Realtime Client Manager with exponential backoff connection retries,
  * online/offline status signals, and message deduplication.
+ *
+ * Authentication: pass a token for a one-shot token, or an `authCallback`
+ * (which may return the raw token string, e.g. from
+ * `getAblyTokenAction(...).then(r => r.token)`) so the short-lived 60s token
+ * renews automatically. A callback is wired into Ably's `authCallback` and is
+ * also used by `connect()` whenever an explicit token is absent.
+ *
+ * Connections are lazy: `subscribe()` triggers the first `connect()`. On
+ * `disconnected`/`suspended`/`failed` a reconnect is scheduled with
+ * exponential backoff; going offline cancels the pending reconnect and coming
+ * back online reconnects immediately.
  */
 export class AblyRealtimeClient {
   private client: Ably.Realtime | null = null
   private connectionState: ConnectionState = 'idle'
   private retryCount = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private connecting = false
   private options: Required<
     Omit<AblyClientOptions, 'token' | 'tokenUrl' | 'authCallback'>
   > &
@@ -195,7 +240,7 @@ export class AblyRealtimeClient {
   private statusListeners = new Set<StatusChangeHandler>()
   private channelSubscriptions = new Map<
     string,
-    Set<{ eventName: string; handler: MessageHandler }>
+    Set<ChannelSubscriptionEntry>
   >()
   private closed = false
 
@@ -229,7 +274,18 @@ export class AblyRealtimeClient {
     return this.networkMonitor.isOnline() ? 'online' : 'offline'
   }
 
+  /**
+   * Registers a status listener. The listener is invoked immediately with the
+   * current status, then on every subsequent state or network change. The
+   * returned function unsubscribes. Registering the same handler reference
+   * again is a no-op.
+   */
   public onStatusChange(handler: StatusChangeHandler): () => void {
+    if (this.statusListeners.has(handler)) {
+      return () => {
+        this.statusListeners.delete(handler)
+      }
+    }
     this.statusListeners.add(handler)
     handler({
       connectionState: this.connectionState,
@@ -253,6 +309,7 @@ export class AblyRealtimeClient {
   }
 
   private handleNetworkChange = (isOnline: boolean) => {
+    if (this.closed) return
     if (!isOnline) {
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer)
@@ -260,22 +317,32 @@ export class AblyRealtimeClient {
       }
       this.setConnectionState('offline')
     } else {
-      if (this.connectionState === 'offline' || this.connectionState === 'reconnecting') {
+      if (
+        this.connectionState === 'offline' ||
+        this.connectionState === 'reconnecting'
+      ) {
         this.retryCount = 0
-        this.connect()
+        void this.connect()
       }
     }
   }
 
+  /**
+   * Establishes (or re-establishes) a realtime connection. Lazy: called
+   * implicitly on the first `subscribe()`. Subsequent calls are ignored while
+   * a connect is already in flight or a reconnect is already queued.
+   */
   public async connect(): Promise<void> {
     if (this.closed) return
+    if (this.connecting) return
+    if (this.reconnectTimer) return
     if (!this.networkMonitor.isOnline()) {
       this.setConnectionState('offline')
       return
     }
-
     if (this.connectionState === 'connected' && this.client) return
 
+    this.connecting = true
     this.setConnectionState(
       this.retryCount === 0 ? 'connecting' : 'reconnecting',
     )
@@ -284,6 +351,11 @@ export class AblyRealtimeClient {
       let token = this.options.token
       if (!token && this.options.authCallback) {
         token = await this.options.authCallback()
+      }
+
+      if (!this.networkMonitor.isOnline()) {
+        this.setConnectionState('offline')
+        return
       }
 
       const ablyOptions: Ably.ClientOptions = {
@@ -296,9 +368,32 @@ export class AblyRealtimeClient {
         ablyOptions.authUrl = this.options.tokenUrl
       }
 
+      // Wire the promise-based callback into Ably so the short-lived token is
+      // renewed automatically once it expires.
+      if (this.options.authCallback) {
+        ablyOptions.authCallback = (_data, callback) => {
+          this.options.authCallback!()
+            .then((renewed) => callback(null, renewed))
+            .catch((err: unknown) =>
+              callback(
+                err instanceof Error ? (err as Ably.ErrorInfo) : null,
+                null,
+              ),
+            )
+        }
+      }
+
+      // A lingering client (e.g. held across an offline window) must not keep
+      // retrying alongside the fresh connection.
+      this.teardownClient()
+
       this.client = new Ably.Realtime(ablyOptions)
 
       this.client.connection.on('connected', () => {
+        if (this.reconnectTimer) {
+          clearTimeout(this.reconnectTimer)
+          this.reconnectTimer = null
+        }
         this.retryCount = 0
         this.setConnectionState('connected')
         this.resubscribeChannels()
@@ -317,17 +412,25 @@ export class AblyRealtimeClient {
       })
     } catch {
       this.scheduleReconnect()
+    } finally {
+      this.connecting = false
     }
   }
 
+  /**
+   * Schedules a reconnect attempt with exponential backoff. No-op when a
+   * reconnect is already queued (one pending timer at a time).
+   */
   private scheduleReconnect() {
     if (this.closed) return
     if (!this.networkMonitor.isOnline()) {
       this.setConnectionState('offline')
       return
     }
+    if (this.reconnectTimer) return
 
     if (this.retryCount >= this.options.maxRetries) {
+      this.teardownClient()
       this.setConnectionState('closed')
       return
     }
@@ -341,11 +444,18 @@ export class AblyRealtimeClient {
 
     this.retryCount += 1
     this.setConnectionState('reconnecting')
+    this.teardownClient()
 
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
       void this.connect()
     }, delay)
+  }
+
+  private teardownClient(): void {
+    if (!this.client) return
+    this.client.close()
+    this.client = null
   }
 
   private resubscribeChannels() {
@@ -353,9 +463,9 @@ export class AblyRealtimeClient {
     for (const [channelName, subs] of this.channelSubscriptions.entries()) {
       const channel = this.client.channels.get(channelName)
       for (const sub of subs) {
-        void channel.subscribe(sub.eventName, (msg) => {
-          this.handleInboundMessage(msg, sub.handler)
-        })
+        void channel
+          .subscribe(sub.eventName, sub.boundHandler)
+          .catch(() => undefined)
       }
     }
   }
@@ -364,7 +474,7 @@ export class AblyRealtimeClient {
     rawMessage: Ably.InboundMessage,
     handler: MessageHandler,
   ) {
-    const msgId = rawMessage.id || `${rawMessage.name}:${JSON.stringify(rawMessage.data)}`
+    const msgId = rawMessage.id || buildDedupeKey(rawMessage)
     // Deduplicate incoming messages before calling handlers
     if (!this.deduplicator.track(msgId)) {
       return
@@ -382,11 +492,19 @@ export class AblyRealtimeClient {
     handler(message)
   }
 
+  /**
+   * Subscribes a handler to an event on a channel. Triggers a lazy connect on
+   * the first subscription. Returns an unsubscribe function that removes ONLY
+   * this subscription's handler (other handlers on the same event/name are
+   * preserved). Safe to call multiple times after the first cleanup.
+   */
   public subscribe<T = unknown>(
     channelName: string,
     eventName: string,
     handler: MessageHandler<T>,
   ): () => void {
+    if (this.closed) return () => undefined
+
     if (this.connectionState === 'idle') {
       void this.connect()
     }
@@ -396,24 +514,33 @@ export class AblyRealtimeClient {
     }
 
     const subs = this.channelSubscriptions.get(channelName)!
-    const entry = { eventName, handler: handler as MessageHandler }
+    const typedHandler = handler as MessageHandler
+    const entry: ChannelSubscriptionEntry = {
+      eventName,
+      handler: typedHandler,
+      boundHandler: (rawMessage) =>
+        this.handleInboundMessage(rawMessage, typedHandler),
+    }
     subs.add(entry)
 
     if (this.client && this.connectionState === 'connected') {
       const channel = this.client.channels.get(channelName)
-      void channel.subscribe(eventName, (rawMsg) => {
-        this.handleInboundMessage(rawMsg, handler as MessageHandler)
-      })
+      void channel
+        .subscribe(eventName, entry.boundHandler)
+        .catch(() => undefined)
     }
 
     return () => {
+      if (!subs.has(entry)) return
       subs.delete(entry)
       if (subs.size === 0) {
         this.channelSubscriptions.delete(channelName)
       }
       if (this.client) {
         const channel = this.client.channels.get(channelName)
-        channel.unsubscribe(eventName)
+        // Pass the specific bound handler so sibling subscriptions under the
+        // same event name on this channel stay intact.
+        channel.unsubscribe(entry.eventName, entry.boundHandler)
       }
     }
   }
@@ -434,6 +561,11 @@ export class AblyRealtimeClient {
     return this.deduplicator
   }
 
+  /**
+   * Tears down the client: cancels any pending reconnect, destroys the
+   * network monitor, clears all subscriptions/listeners/dedupe state, and
+   * closes the underlying Ably connection. Idempotent.
+   */
   public close(): void {
     this.closed = true
     if (this.reconnectTimer) {
@@ -444,10 +576,7 @@ export class AblyRealtimeClient {
     this.channelSubscriptions.clear()
     this.statusListeners.clear()
     this.deduplicator.clear()
-    if (this.client) {
-      this.client.close()
-      this.client = null
-    }
+    this.teardownClient()
     this.setConnectionState('closed')
   }
 }

@@ -21,6 +21,11 @@ export function isOptimisticId(id: string): boolean {
   return id.startsWith(OPTIMISTIC_PREFIX)
 }
 
+/** Wrap a client idempotency key in the optimistic placeholder namespace. */
+export function buildOptimisticId(clientMessageId: string): string {
+  return `${OPTIMISTIC_PREFIX}${clientMessageId}`
+}
+
 /** Recovers the idempotency key from an optimistic message id (for retry). */
 export function extractClientMessageId(id: string): string | null {
   if (!isOptimisticId(id)) return null
@@ -28,8 +33,20 @@ export function extractClientMessageId(id: string): string | null {
 }
 
 /**
- * Derive the visible state for one message. Returns null for messages sent by
- * the other participant (receipt ticks are only meaningful for your own sends).
+ * Minimal tick-glyph view-model for a status row. UI agents map `kind` to a
+ * single tick (sent), double tick (read), spinner (sending), or a retry
+ * affordance (failed).
+ */
+export type MessageStatusView =
+  | { kind: 'sending'; label: string }
+  | { kind: 'sent'; label: string }
+  | { kind: 'read'; label: string }
+  | { kind: 'failed'; label: string; retriable: true }
+
+/**
+ * Derive the visible state for one of the VIEWER'S OWN messages. Receipt
+ * ticks are only meaningful for your own sends, so callers must skip peer
+ * messages before invoking this (the sender is not among the inputs).
  * `failed` overrides everything: an errored send stays failed until retried.
  */
 export function deriveMessageState(
